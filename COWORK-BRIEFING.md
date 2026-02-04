@@ -1,7 +1,8 @@
 # OctopusScheduler — Build Session Briefing
 
-**Date:** 2026-02-04 ~1:55 AM - 2:50 AM EST
+**Date:** 2026-02-04 ~1:55 AM - 3:10 AM EST
 **Participants:** wcs + Claude Code (Opus 4.5)
+**Repo:** https://github.com/c-aramai/octopus-scheduler
 
 ## What We Built
 
@@ -94,3 +95,10 @@ Only 3 permissions needed (down from 4 — eliminated Screen Recording):
 - Check log files at `~/.octopus-scheduler/logs/`
 - Create an `evening-summary.md` prompt template
 - Consider config file watching for auto-reload
+
+## Repository
+
+Public repo created at https://github.com/c-aramai/octopus-scheduler
+- Branch: `main`
+- 26 files, 2,511 lines
+- Includes specs (SPEC.md, SPEC-v2.md, VISION.md), build prompt, and full source
