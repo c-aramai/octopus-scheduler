@@ -22,6 +22,7 @@
 		AA10000D /* LogService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000011 /* LogService.swift */; };
 		AA10000E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA00000E /* Assets.xcassets */; };
 		AA10000F /* BridgeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000012 /* BridgeService.swift */; };
+		AA100010 /* UpdateChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000013 /* UpdateChecker.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -43,6 +44,7 @@
 		AA000010 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
 		AA000011 /* LogService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogService.swift; sourceTree = "<group>"; };
 		AA000012 /* BridgeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeService.swift; sourceTree = "<group>"; };
+		AA000013 /* UpdateChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateChecker.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -99,6 +101,7 @@
 				AA000010 /* NotificationService.swift */,
 				AA000011 /* LogService.swift */,
 				AA000012 /* BridgeService.swift */,
+				AA000013 /* UpdateChecker.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -206,6 +209,7 @@
 				AA10000C /* NotificationService.swift in Sources */,
 				AA10000D /* LogService.swift in Sources */,
 				AA10000F /* BridgeService.swift in Sources */,
+				AA100010 /* UpdateChecker.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

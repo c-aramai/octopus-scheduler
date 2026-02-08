@@ -40,6 +40,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             DispatchQueue.main.async { self?.rebuildMenu() }
         })
 
+        // Silent update check
+        Task { await UpdateChecker.shared.checkForUpdates() }
+
         logService.log("OctopusScheduler launched")
     }
 
@@ -191,6 +194,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         syncItem.target = self
         menu.addItem(syncItem)
 
+        // Check for Updates
+        let updateItem = NSMenuItem(title: "Check for Updates...", action: #selector(checkForUpdates), keyEquivalent: "u")
+        updateItem.target = self
+        menu.addItem(updateItem)
+
         menu.addItem(NSMenuItem.separator())
 
         // Quit
@@ -251,5 +259,27 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         schedulerEngine.restart()
         rebuildMenu()
         logService.log("Sync completed")
+    }
+
+    @objc private func checkForUpdates() {
+        Task { @MainActor in
+            await UpdateChecker.shared.checkForUpdates()
+            let checker = UpdateChecker.shared
+
+            let alert = NSAlert()
+            if checker.updateAvailable, let version = checker.latestVersion {
+                alert.messageText = "Update Available"
+                alert.informativeText = "Version \(version) is available. You have \(checker.currentVersion)."
+                alert.addButton(withTitle: "Download")
+                alert.addButton(withTitle: "Later")
+                if alert.runModal() == .alertFirstButtonReturn, let url = checker.downloadURL {
+                    NSWorkspace.shared.open(url)
+                }
+            } else {
+                alert.messageText = "You're up to date"
+                alert.informativeText = "OctopusScheduler \(checker.currentVersion) is the latest version."
+                alert.runModal()
+            }
+        }
     }
 }
