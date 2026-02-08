@@ -261,15 +261,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         logService.log("Sync completed")
     }
 
+    private func makeAppIcon() -> NSImage {
+        let size = NSSize(width: 64, height: 64)
+        let image = NSImage(size: size)
+        image.lockFocus()
+        let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 48)]
+        let str = NSAttributedString(string: "🐙", attributes: attrs)
+        let strSize = str.size()
+        str.draw(at: NSPoint(x: (size.width - strSize.width) / 2, y: (size.height - strSize.height) / 2))
+        image.unlockFocus()
+        return image
+    }
+
     @objc private func checkForUpdates() {
         Task { @MainActor in
             await UpdateChecker.shared.checkForUpdates()
             let checker = UpdateChecker.shared
 
             let alert = NSAlert()
+            alert.icon = makeAppIcon()
             if checker.updateAvailable, let version = checker.latestVersion {
                 alert.messageText = "Update Available"
-                alert.informativeText = "Version \(version) is available. You have \(checker.currentVersion)."
+                alert.informativeText = "OctopusScheduler v\(version) is available.\nYou're running v\(checker.currentVersion)."
                 alert.addButton(withTitle: "Download")
                 alert.addButton(withTitle: "Later")
                 if alert.runModal() == .alertFirstButtonReturn, let url = checker.downloadURL {
@@ -277,7 +290,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             } else {
                 alert.messageText = "You're up to date"
-                alert.informativeText = "OctopusScheduler \(checker.currentVersion) is the latest version."
+                alert.informativeText = "OctopusScheduler v\(checker.currentVersion) is the latest version."
                 alert.runModal()
             }
         }
