@@ -70,20 +70,62 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func rebuildMenu() {
         let menu = NSMenu()
+        let config = configManager.config
+        let schedules = config?.schedules ?? []
 
-        // Schedule items
-        let schedules = configManager.config?.schedules ?? []
-        if schedules.isEmpty {
+        // Header
+        let version = config?.version ?? Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.2.0"
+        let headerItem = NSMenuItem(title: "OCTOPUS Scheduler v\(version)", action: nil, keyEquivalent: "")
+        headerItem.isEnabled = false
+        menu.addItem(headerItem)
+
+        // Connection status
+        let bridgeUrl = config?.bridge?.url
+        let statusText: String
+        if bridgeUrl == nil || bridgeUrl?.isEmpty == true {
+            statusText = "● Not configured"
+        } else {
+            statusText = "● Bridge configured"
+        }
+        let statusItem = NSMenuItem(title: statusText, action: nil, keyEquivalent: "")
+        statusItem.isEnabled = false
+        menu.addItem(statusItem)
+
+        menu.addItem(NSMenuItem.separator())
+
+        // Active workflows
+        let active = schedules.filter { $0.enabled }
+        let paused = schedules.filter { !$0.enabled }
+
+        if active.isEmpty && paused.isEmpty {
             let item = NSMenuItem(title: "No schedules configured", action: nil, keyEquivalent: "")
             item.isEnabled = false
             menu.addItem(item)
         } else {
-            for schedule in schedules {
-                let title = "\(schedule.enabled ? "✓ " : "   ")\(schedule.name) (\(schedule.schedule.time))"
-                let item = NSMenuItem(title: title, action: #selector(toggleSchedule(_:)), keyEquivalent: "")
-                item.target = self
-                item.representedObject = schedule.id
-                menu.addItem(item)
+            if !active.isEmpty {
+                let activeHeader = NSMenuItem(title: "▶ Active Workflows (\(active.count))", action: nil, keyEquivalent: "")
+                activeHeader.isEnabled = false
+                menu.addItem(activeHeader)
+                for schedule in active {
+                    let nextStr = formatNextFire(schedule)
+                    let item = NSMenuItem(title: "    \(schedule.name) — next: \(nextStr)", action: #selector(toggleSchedule(_:)), keyEquivalent: "")
+                    item.target = self
+                    item.representedObject = schedule.id
+                    menu.addItem(item)
+                }
+            }
+
+            if !paused.isEmpty {
+                if !active.isEmpty { menu.addItem(NSMenuItem.separator()) }
+                let pausedHeader = NSMenuItem(title: "⏸ Paused (\(paused.count))", action: nil, keyEquivalent: "")
+                pausedHeader.isEnabled = false
+                menu.addItem(pausedHeader)
+                for schedule in paused {
+                    let item = NSMenuItem(title: "    \(schedule.name) — paused", action: #selector(toggleSchedule(_:)), keyEquivalent: "")
+                    item.target = self
+                    item.representedObject = schedule.id
+                    menu.addItem(item)
+                }
             }
         }
 
@@ -109,22 +151,53 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem.separator())
 
         // Settings
-        let settingsItem = NSMenuItem(title: "Settings...", action: #selector(openSettings), keyEquivalent: ",")
+        let settingsItem = NSMenuItem(title: "⚙ Settings...", action: #selector(openSettings), keyEquivalent: ",")
         settingsItem.target = self
         menu.addItem(settingsItem)
 
+        // View Logs
+        let logsItem = NSMenuItem(title: "📋 View Logs...", action: #selector(viewLogs), keyEquivalent: "")
+        logsItem.target = self
+        menu.addItem(logsItem)
+
         // Reload config
-        let reloadItem = NSMenuItem(title: "Reload Config", action: #selector(reloadConfig), keyEquivalent: "r")
+        let reloadItem = NSMenuItem(title: "🔄 Reload Config", action: #selector(reloadConfig), keyEquivalent: "r")
         reloadItem.target = self
         menu.addItem(reloadItem)
 
         menu.addItem(NSMenuItem.separator())
 
         // Quit
-        let quitItem = NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        let quitItem = NSMenuItem(title: "Quit OCTOPUS Scheduler", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         menu.addItem(quitItem)
 
-        statusItem.menu = menu
+        self.statusItem.menu = menu
+    }
+
+    private func formatNextFire(_ schedule: ScheduleConfig) -> String {
+        guard let fireDate = schedule.nextFireDate() else { return "unknown" }
+        let calendar = Calendar.current
+
+        if calendar.isDateInToday(fireDate) {
+            let fmt = DateFormatter()
+            fmt.dateFormat = "h:mm a"
+            return "today \(fmt.string(from: fireDate))"
+        } else if calendar.isDateInTomorrow(fireDate) {
+            let fmt = DateFormatter()
+            fmt.dateFormat = "h:mm a"
+            return "tomorrow \(fmt.string(from: fireDate))"
+        } else {
+            let fmt = DateFormatter()
+            fmt.dateFormat = "EEEE h:mm a"
+            return fmt.string(from: fireDate)
+        }
+    }
+
+    @objc private func viewLogs() {
+        let logDir = configManager.config?.globalOptions.logDirectory ?? "~/.octopus-scheduler/logs"
+        let resolved = (logDir as NSString).expandingTildeInPath
+        try? FileManager.default.createDirectory(atPath: resolved, withIntermediateDirectories: true)
+        NSWorkspace.shared.open(URL(fileURLWithPath: resolved, isDirectory: true))
     }
 
     @objc private func toggleSchedule(_ sender: NSMenuItem) {

@@ -12,10 +12,13 @@ struct SettingsView: View {
             SchedulesSettingsView(configManager: configManager, schedulerEngine: schedulerEngine)
                 .tabItem { Label("Schedules", systemImage: "clock") }
 
+            NotificationsSettingsView(configManager: configManager, schedulerEngine: schedulerEngine)
+                .tabItem { Label("Notifications", systemImage: "bell") }
+
             AboutView()
                 .tabItem { Label("About", systemImage: "info.circle") }
         }
-        .frame(width: 480, height: 360)
+        .frame(width: 520, height: 400)
     }
 }
 
@@ -28,18 +31,35 @@ struct GeneralSettingsView: View {
     var body: some View {
         Form {
             if var config = configManager.config {
-                TextField("Prompts Directory:", text: Binding(
-                    get: { config.promptsDirectory },
+                TextField("Peer Name:", text: Binding(
+                    get: { config.peerId ?? Host.current().localizedName ?? "unknown" },
                     set: { newValue in
-                        config.promptsDirectory = newValue
+                        config.peerId = newValue
                         configManager.config = config
                     }
                 ))
 
-                Toggle("Show Notifications", isOn: Binding(
-                    get: { config.globalOptions.showNotifications },
+                TextField("Domain:", text: Binding(
+                    get: { config.domain ?? "aramai.io" },
                     set: { newValue in
-                        config.globalOptions.showNotifications = newValue
+                        config.domain = newValue
+                        configManager.config = config
+                    }
+                ))
+
+                TextField("Bridge URL:", text: Binding(
+                    get: { config.bridge?.url ?? "https://octopus-bridge.vercel.app" },
+                    set: { newValue in
+                        if config.bridge == nil { config.bridge = BridgeConfig() }
+                        config.bridge?.url = newValue
+                        configManager.config = config
+                    }
+                ))
+
+                TextField("Prompts Directory:", text: Binding(
+                    get: { config.promptsDirectory },
+                    set: { newValue in
+                        config.promptsDirectory = newValue
                         configManager.config = config
                     }
                 ))
@@ -93,9 +113,14 @@ struct SchedulesSettingsView: View {
 
                             VStack(alignment: .leading) {
                                 Text(schedule.name).font(.headline)
-                                Text("\(schedule.schedule.time) - \(schedule.promptFile)")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
+                                HStack {
+                                    Text("\(schedule.schedule.time) - \(schedule.promptFile)")
+                                    if schedule.enabled, let next = schedule.nextFireDate() {
+                                        Text("· next: \(nextFireLabel(next))")
+                                    }
+                                }
+                                .font(.caption)
+                                .foregroundColor(.secondary)
                             }
 
                             Spacer()
@@ -117,6 +142,93 @@ struct SchedulesSettingsView: View {
         }
         .padding()
     }
+
+    private func nextFireLabel(_ date: Date) -> String {
+        let calendar = Calendar.current
+        let fmt = DateFormatter()
+        fmt.dateFormat = "h:mm a"
+        if calendar.isDateInToday(date) {
+            return "today \(fmt.string(from: date))"
+        } else if calendar.isDateInTomorrow(date) {
+            return "tomorrow \(fmt.string(from: date))"
+        } else {
+            let dayFmt = DateFormatter()
+            dayFmt.dateFormat = "EEEE h:mm a"
+            return dayFmt.string(from: date)
+        }
+    }
+}
+
+// MARK: - Notifications
+
+struct NotificationsSettingsView: View {
+    @ObservedObject var configManager: ConfigManager
+    @ObservedObject var schedulerEngine: SchedulerEngine
+
+    var body: some View {
+        Form {
+            if var config = configManager.config {
+                TextField("Slack Webhook URL:", text: Binding(
+                    get: { config.slack?.webhookUrl ?? "" },
+                    set: { newValue in
+                        if config.slack == nil { config.slack = SlackConfig() }
+                        config.slack?.webhookUrl = newValue.isEmpty ? nil : newValue
+                        configManager.config = config
+                    }
+                ))
+
+                TextField("Default Slack Channel:", text: Binding(
+                    get: { config.slack?.defaultChannel ?? "" },
+                    set: { newValue in
+                        if config.slack == nil { config.slack = SlackConfig() }
+                        config.slack?.defaultChannel = newValue.isEmpty ? nil : newValue
+                        configManager.config = config
+                    }
+                ))
+
+                Toggle("Show Notifications", isOn: Binding(
+                    get: { config.globalOptions.showNotifications },
+                    set: { newValue in
+                        config.globalOptions.showNotifications = newValue
+                        configManager.config = config
+                    }
+                ))
+
+                Toggle("Notify on workflow complete", isOn: Binding(
+                    get: { config.slack?.notifyOnComplete ?? true },
+                    set: { newValue in
+                        if config.slack == nil { config.slack = SlackConfig() }
+                        config.slack?.notifyOnComplete = newValue
+                        configManager.config = config
+                    }
+                ))
+
+                Toggle("Notify on workflow failure", isOn: Binding(
+                    get: { config.slack?.notifyOnFailure ?? true },
+                    set: { newValue in
+                        if config.slack == nil { config.slack = SlackConfig() }
+                        config.slack?.notifyOnFailure = newValue
+                        configManager.config = config
+                    }
+                ))
+
+                HStack {
+                    Spacer()
+                    Button("Save") {
+                        configManager.save()
+                    }
+                    .keyboardShortcut(.defaultAction)
+                }
+            } else {
+                Text("No configuration loaded.")
+                    .foregroundColor(.secondary)
+                Button("Reload Config") {
+                    configManager.load()
+                }
+            }
+        }
+        .padding()
+    }
 }
 
 // MARK: - About
@@ -124,16 +236,20 @@ struct SchedulesSettingsView: View {
 struct AboutView: View {
     var body: some View {
         VStack(spacing: 12) {
-            Text("OctopusScheduler")
+            Text("ARAMAI")
                 .font(.title)
-            Text("Automated Claude Desktop Scheduling")
+                .fontWeight(.semibold)
+            Text("OCTOPUS Scheduler")
+                .font(.title3)
                 .foregroundColor(.secondary)
-            Text("Version 1.0")
+            Text("Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.2.0")")
                 .font(.caption)
                 .foregroundColor(.secondary)
             Spacer()
-            Text("Orchestrated Claude Task Operations\nfor Proactive Unified Scheduling")
-                .multilineTextAlignment(.center)
+            Text("Part of the Semantic Intelligence Architecture")
+                .font(.callout)
+                .foregroundColor(.secondary)
+            Text("© 2026 Hexagon Holdings LLC (ADGM)")
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
