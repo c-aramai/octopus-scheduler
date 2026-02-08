@@ -149,6 +149,7 @@
   - Scheduler becomes "scheduler" agent in the OCTOPUS ecosystem
   - Can receive tasks via MCP (not just time triggers)
 - **Effort:** Medium
+- **Partial (v1.2.0):** BridgeService added — health check polling (GET /api/health every 30s), peer discovery (GET /api/peers), live status in menu bar, "Sync Now" action. Full handoff integration remains.
 
 ---
 

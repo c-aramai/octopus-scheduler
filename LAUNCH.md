@@ -31,6 +31,26 @@ Copy this entire command to start the build:
 cd ~/ARAMAI/dev/octopus-scheduler && claude --dangerously-skip-permissions "Read BUILD-PROMPT.md and follow all instructions to build the complete OctopusScheduler macOS application. Create all files, the Xcode project, and verify it compiles with xcodebuild."
 ```
 
+## Quick Install (v1.2.0 Distribution Package)
+
+For pre-built distribution:
+
+1. **Unzip** `OctopusScheduler/build/dist/OctopusScheduler-v1.2.0.zip`
+2. **Drag** `OctopusScheduler.app` to Applications
+3. **Right-click → Open** (first launch bypasses Gatekeeper)
+4. **Copy config:**
+   ```bash
+   mkdir -p ~/.octopus-scheduler
+   cp config/default-config.json ~/.octopus-scheduler/config.json
+   ```
+5. **Copy prompts:**
+   ```bash
+   mkdir -p ~/ARAMAI/prompts/scheduled
+   cp prompts/*.md ~/ARAMAI/prompts/scheduled/
+   ```
+6. **Grant Accessibility Permission** when macOS prompts
+7. **Test**: Click the 🐙 menu bar icon → verify Bridge status shows green
+
 ## After Build Completes
 
 1. **Open Xcode**:
@@ -42,10 +62,10 @@ cd ~/ARAMAI/dev/octopus-scheduler && claude --dangerously-skip-permissions "Read
 
 3. **Grant Accessibility Permission** when macOS prompts
 
-4. **Create config** (if Claude didn't):
+4. **Create config** (if not present):
    ```bash
    mkdir -p ~/.octopus-scheduler
-   cp ~/ARAMAI/dev/octopus-scheduler/sample-config.json ~/.octopus-scheduler/config.json
+   cp OctopusScheduler/build/dist/OctopusScheduler-v1.2.0/config/default-config.json ~/.octopus-scheduler/config.json
    ```
 
 5. **Test**: Click the 🐙 menu bar icon → Run Now → Morning Briefing

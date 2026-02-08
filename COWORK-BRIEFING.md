@@ -50,11 +50,15 @@ Updated the Xcode project (project.pbxproj) to include the two new service files
 ## Current State
 
 **Working:**
-- 🐙 menu bar icon with schedule list, Run Now submenu, Settings, Reload Config, Quit
+- 🐙 menu bar icon with schedule list, Run Now submenu, Settings, Sync Now, Quit
 - Morning Briefing and Evening Summary both tested manually via Run Now
 - Config loads/saves, schedules toggle on/off from menu
-- Settings window with General/Schedules/About tabs
+- Settings window with General/Schedules/Notifications/About tabs
+- Live Bridge status in menu bar (🟢 Connected / 🔴 Disconnected / ⚪ Not configured)
+- Peers Online section showing connected peers from Bridge network
+- "Sync Now" reloads config and refreshes Bridge status
 - Builds clean with both Xcode (Cmd+R) and SPM (`swift build`)
+- v1.2.0 distribution package available (zip with app, prompts, config, README)
 
 **Not yet tested:**
 - Overnight scheduled execution (timers are set, just hasn't hit 6:00 AM yet)
@@ -75,10 +79,11 @@ Updated the Xcode project (project.pbxproj) to include the two new service files
 ## Files Created/Modified
 
 ```
-~/.octopus-scheduler/config.json              # Sample config (2 schedules)
+~/.octopus-scheduler/config.json              # Runtime config (schedules + bridge URL)
 ~/ARAMAI/prompts/scheduled/morning-briefing.md # Sample prompt template
 ~/ARAMAI/dev/octopus-scheduler/SPEC-v2.md      # Updated specification
-~/ARAMAI/dev/octopus-scheduler/OctopusScheduler/  # Full project (14 source files)
+~/ARAMAI/dev/octopus-scheduler/OctopusScheduler/  # Full project (15 source files)
+~/ARAMAI/dev/octopus-scheduler/OctopusScheduler/build/dist/OctopusScheduler-v1.2.0.zip  # Distribution package
 ```
 
 ## Permissions Required (For New Installs)
@@ -93,8 +98,8 @@ Only 3 permissions needed (down from 4 — eliminated Screen Recording):
 - Verify scheduled execution fires at 6:00 AM
 - Test notification display
 - Check log files at `~/.octopus-scheduler/logs/`
-- Create an `evening-summary.md` prompt template
-- Consider config file watching for auto-reload
+- Distribute v1.2.0 package to Mariam for DevRel ops
+- Configure Slack webhook for #devrel-ops notifications
 
 ## Repository
 
