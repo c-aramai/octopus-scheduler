@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import ServiceManagement
 import SwiftUI
 
@@ -10,6 +11,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private let promptLoader = PromptLoader()
     private let notificationService = NotificationService()
     private let logService = LogService()
+    private let bridgeService = BridgeService()
+    private var bridgeCancellable: AnyCancellable?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupMenuBar()
@@ -29,6 +32,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             logService: logService
         )
         schedulerEngine.start()
+
+        // Bridge service
+        bridgeService.configure(bridgeUrl: config.bridge?.url)
+        bridgeService.startPolling()
+        bridgeCancellable = bridgeService.objectWillChange.sink(receiveValue: { [weak self] in
+            DispatchQueue.main.async { self?.rebuildMenu() }
+        })
+
         logService.log("OctopusScheduler launched")
     }
 
@@ -79,17 +90,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         headerItem.isEnabled = false
         menu.addItem(headerItem)
 
-        // Connection status
-        let bridgeUrl = config?.bridge?.url
+        // Connection status (live)
         let statusText: String
-        if bridgeUrl == nil || bridgeUrl?.isEmpty == true {
-            statusText = "● Not configured"
-        } else {
-            statusText = "● Bridge configured"
+        switch bridgeService.status {
+        case .connected:
+            statusText = "🟢 Connected to Bridge"
+        case .disconnected:
+            statusText = "🔴 Bridge disconnected"
+        case .notConfigured:
+            statusText = "⚪ Bridge not configured"
         }
-        let statusItem = NSMenuItem(title: statusText, action: nil, keyEquivalent: "")
-        statusItem.isEnabled = false
-        menu.addItem(statusItem)
+        let bridgeStatusItem = NSMenuItem(title: statusText, action: nil, keyEquivalent: "")
+        bridgeStatusItem.isEnabled = false
+        menu.addItem(bridgeStatusItem)
 
         menu.addItem(NSMenuItem.separator())
 
@@ -129,6 +142,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
+        // Peers Online
+        if !bridgeService.peers.isEmpty {
+            menu.addItem(NSMenuItem.separator())
+            let peersHeader = NSMenuItem(title: "👥 Peers Online (\(bridgeService.peers.count))", action: nil, keyEquivalent: "")
+            peersHeader.isEnabled = false
+            menu.addItem(peersHeader)
+            for peer in bridgeService.peers {
+                let item = NSMenuItem(title: "    \(peer.peerId)", action: nil, keyEquivalent: "")
+                item.isEnabled = false
+                menu.addItem(item)
+            }
+        }
+
         menu.addItem(NSMenuItem.separator())
 
         // Run Now submenu
@@ -160,10 +186,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         logsItem.target = self
         menu.addItem(logsItem)
 
-        // Reload config
-        let reloadItem = NSMenuItem(title: "🔄 Reload Config", action: #selector(reloadConfig), keyEquivalent: "r")
-        reloadItem.target = self
-        menu.addItem(reloadItem)
+        // Sync Now
+        let syncItem = NSMenuItem(title: "🔄 Sync Now", action: #selector(syncNow), keyEquivalent: "r")
+        syncItem.target = self
+        menu.addItem(syncItem)
 
         menu.addItem(NSMenuItem.separator())
 
@@ -217,10 +243,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    @objc private func reloadConfig() {
+    @objc private func syncNow() {
         configManager.load()
+        let config = configManager.config ?? .defaultConfig
+        bridgeService.configure(bridgeUrl: config.bridge?.url)
+        bridgeService.syncNow()
         schedulerEngine.restart()
         rebuildMenu()
-        logService.log("Config reloaded")
+        logService.log("Sync completed")
     }
 }

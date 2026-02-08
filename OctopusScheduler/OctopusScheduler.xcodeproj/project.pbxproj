@@ -21,6 +21,7 @@
 		AA10000C /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000010 /* NotificationService.swift */; };
 		AA10000D /* LogService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000011 /* LogService.swift */; };
 		AA10000E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA00000E /* Assets.xcassets */; };
+		AA10000F /* BridgeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000012 /* BridgeService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -41,6 +42,7 @@
 		AA00000F /* OctopusScheduler.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OctopusScheduler.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA000010 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
 		AA000011 /* LogService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogService.swift; sourceTree = "<group>"; };
+		AA000012 /* BridgeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -96,6 +98,7 @@
 				AA000009 /* ClaudeAutomator.swift */,
 				AA000010 /* NotificationService.swift */,
 				AA000011 /* LogService.swift */,
+				AA000012 /* BridgeService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -202,6 +205,7 @@
 				AA10000B /* SettingsView.swift in Sources */,
 				AA10000C /* NotificationService.swift in Sources */,
 				AA10000D /* LogService.swift in Sources */,
+				AA10000F /* BridgeService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
