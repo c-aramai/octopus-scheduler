@@ -1,4 +1,10 @@
-## What's New
+## v1.2.1 — Check for Updates
+
+- **Check for Updates** — Menu item queries GitHub Releases API, shows dialog with download link if newer version available
+- **App Icon in Dialogs** — 🐙 icon displays in update and alert dialogs
+- **Silent Update Check** — Checks for updates on launch without interrupting
+
+## v1.2.0 — Mariam MVP
 
 - **Live Bridge Status** — Green/red/gray indicators show real-time connection health (polls every 30s)
 - **Peers Online** — See connected peers from Bridge network in menu bar
@@ -8,7 +14,7 @@
 
 ## Installation
 
-1. Download `OctopusScheduler-v1.2.0.zip`
+1. Download `OctopusScheduler-v1.2.1.zip`
 2. Unzip and drag `OctopusScheduler.app` to `/Applications`
 3. Right-click → Open (first launch, to bypass Gatekeeper)
 4. Copy `config/default-config.json` to `~/.octopus-scheduler/config.json`

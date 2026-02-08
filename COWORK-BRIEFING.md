@@ -58,7 +58,9 @@ Updated the Xcode project (project.pbxproj) to include the two new service files
 - Peers Online section showing connected peers from Bridge network
 - "Sync Now" reloads config and refreshes Bridge status
 - Builds clean with both Xcode (Cmd+R) and SPM (`swift build`)
-- v1.2.0 distribution package available (zip with app, prompts, config, README)
+- v1.2.1 distribution package available (zip with app, prompts, config, README)
+- "Check for Updates..." queries GitHub Releases API, shows download link if newer version exists
+- GitHub Releases infrastructure: v1.2.0 tagged and published with zip asset
 
 **Not yet tested:**
 - Overnight scheduled execution (timers are set, just hasn't hit 6:00 AM yet)
@@ -83,7 +85,8 @@ Updated the Xcode project (project.pbxproj) to include the two new service files
 ~/ARAMAI/prompts/scheduled/morning-briefing.md # Sample prompt template
 ~/ARAMAI/dev/octopus-scheduler/SPEC-v2.md      # Updated specification
 ~/ARAMAI/dev/octopus-scheduler/OctopusScheduler/  # Full project (15 source files)
-~/ARAMAI/dev/octopus-scheduler/OctopusScheduler/build/dist/OctopusScheduler-v1.2.0.zip  # Distribution package
+~/ARAMAI/dev/octopus-scheduler/OctopusScheduler/build/dist/OctopusScheduler-v1.2.1.zip  # Distribution package
+~/ARAMAI/dev/octopus-scheduler/docs/RELEASING.md  # Release process documentation
 ```
 
 ## Permissions Required (For New Installs)
