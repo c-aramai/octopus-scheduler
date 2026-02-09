@@ -170,15 +170,16 @@ class SchedulerEngine: ObservableObject {
             let errorMsg = "Could not load prompt file"
             logService?.error("Failed to load prompt from \(filePath)")
             notificationService?.notify(title: "OctopusScheduler", body: "\(schedule.name) failed: could not load prompt file")
-            slackNotifier?.notify(event: SchedulerEvent(type: "prompt.failed", scheduleId: schedule.id, scheduleName: schedule.name, error: errorMsg))
+            slackNotifier?.notify(event: SchedulerEvent(type: "prompt.failed", scheduleId: schedule.id, scheduleName: schedule.name, error: errorMsg, channel: schedule.options.slackChannel))
             appendHistory(ExecutionRecord(scheduleId: schedule.id, scheduleName: schedule.name, timestamp: Date(), success: false, error: errorMsg))
             return
         }
 
         let renderedPrompt = template.rendered()
         let newConversation = schedule.options.newConversation ?? true
+        let channel = schedule.options.slackChannel
 
-        slackNotifier?.notify(event: SchedulerEvent(type: "prompt.fired", scheduleId: schedule.id, scheduleName: schedule.name))
+        slackNotifier?.notify(event: SchedulerEvent(type: "prompt.fired", scheduleId: schedule.id, scheduleName: schedule.name, channel: channel))
 
         // Retry loop: initial attempt + 3 retries
         let backoff: [TimeInterval] = [5, 15, 45]
@@ -189,7 +190,7 @@ class SchedulerEngine: ObservableObject {
             if success {
                 logService?.log("\(prefix)'\(schedule.name)' sent successfully")
                 notificationService?.notify(title: "OctopusScheduler", body: "\(prefix)\(schedule.name) sent to Claude")
-                slackNotifier?.notify(event: SchedulerEvent(type: "prompt.succeeded", scheduleId: schedule.id, scheduleName: schedule.name))
+                slackNotifier?.notify(event: SchedulerEvent(type: "prompt.succeeded", scheduleId: schedule.id, scheduleName: schedule.name, channel: channel))
                 appendHistory(ExecutionRecord(scheduleId: schedule.id, scheduleName: schedule.name, timestamp: Date(), success: true, error: nil))
                 DispatchQueue.main.async {
                     self.lastExecution[schedule.id] = Date()
@@ -209,7 +210,7 @@ class SchedulerEngine: ObservableObject {
         let errorMsg = "Failed after \(maxAttempts) attempts"
         logService?.error("\(prefix)'\(schedule.name)' \(errorMsg)")
         notificationService?.notify(title: "OctopusScheduler", body: "\(prefix)\(schedule.name) failed to send")
-        slackNotifier?.notify(event: SchedulerEvent(type: "prompt.failed", scheduleId: schedule.id, scheduleName: schedule.name, error: errorMsg))
+        slackNotifier?.notify(event: SchedulerEvent(type: "prompt.failed", scheduleId: schedule.id, scheduleName: schedule.name, error: errorMsg, channel: channel))
         appendHistory(ExecutionRecord(scheduleId: schedule.id, scheduleName: schedule.name, timestamp: Date(), success: false, error: errorMsg))
     }
 

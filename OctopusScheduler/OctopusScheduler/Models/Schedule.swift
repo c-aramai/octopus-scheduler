@@ -66,10 +66,12 @@ struct ScheduleOptions: Codable {
     var activateClaude: Bool?
     var newConversation: Bool?
     var waitForResponse: Bool?
+    var slackChannel: String?
 
-    init(activateClaude: Bool? = true, newConversation: Bool? = true, waitForResponse: Bool? = false) {
+    init(activateClaude: Bool? = true, newConversation: Bool? = true, waitForResponse: Bool? = false, slackChannel: String? = nil) {
         self.activateClaude = activateClaude
         self.newConversation = newConversation
         self.waitForResponse = waitForResponse
+        self.slackChannel = slackChannel
     }
 }

@@ -299,6 +299,7 @@ struct ScheduleEditorView: View {
     let scheduleId: String
     let isNew: Bool
     @ObservedObject var configManager: ConfigManager
+    var slackNotifier: SlackNotifier?
     var onSave: (() -> Void)?
 
     @State private var name: String = ""
@@ -313,12 +314,19 @@ struct ScheduleEditorView: View {
     @State private var sat = false
     @State private var sun = false
     @State private var newConversation: Bool = true
+    @State private var slackChannel: String = ""
     @State private var showDeleteConfirm = false
+    @State private var showSavedPill = false
+    @State private var saveDebounce: Timer?
+    @State private var slackTestResult: String?
+    @State private var slackTestOK = false
+    @State private var slackTesting = false
 
-    init(scheduleId: String, isNew: Bool = false, configManager: ConfigManager, onSave: (() -> Void)? = nil) {
+    init(scheduleId: String, isNew: Bool = false, configManager: ConfigManager, slackNotifier: SlackNotifier? = nil, onSave: (() -> Void)? = nil) {
         self.scheduleId = scheduleId
         self.isNew = isNew
         self.configManager = configManager
+        self.slackNotifier = slackNotifier
         self.onSave = onSave
     }
 
@@ -366,7 +374,40 @@ struct ScheduleEditorView: View {
                 Divider()
 
                 Toggle("New conversation each run", isOn: $newConversation)
+
+                HStack(spacing: 6) {
+                    TextField("Slack channel:", text: $slackChannel, prompt: Text("none"))
+                        .frame(maxWidth: 200)
+                    Button(slackTesting ? "Testing..." : "Test") {
+                        testSlackChannel()
+                    }
+                    .disabled(slackTesting)
+                    .controlSize(.small)
+
+                    if let result = slackTestResult {
+                        Text(slackTestOK ? "Sent" : result)
+                            .font(.caption)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(slackTestOK ? Color.green.opacity(0.8) : Color.red.opacity(0.8))
+                            .foregroundColor(.white)
+                            .cornerRadius(8)
+                    }
+                }
             }
+            .onChange(of: name) { _ in debounceSave() }
+            .onChange(of: time) { _ in debounceSave() }
+            .onChange(of: promptFile) { _ in debounceSave() }
+            .onChange(of: enabled) { _ in debounceSave() }
+            .onChange(of: newConversation) { _ in debounceSave() }
+            .onChange(of: slackChannel) { _ in debounceSave() }
+            .onChange(of: mon) { _ in debounceSave() }
+            .onChange(of: tue) { _ in debounceSave() }
+            .onChange(of: wed) { _ in debounceSave() }
+            .onChange(of: thu) { _ in debounceSave() }
+            .onChange(of: fri) { _ in debounceSave() }
+            .onChange(of: sat) { _ in debounceSave() }
+            .onChange(of: sun) { _ in debounceSave() }
 
             Divider()
 
@@ -385,12 +426,23 @@ struct ScheduleEditorView: View {
 
                 Spacer()
 
+                if showSavedPill {
+                    Text("Saved")
+                        .font(.caption)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 2)
+                        .background(Color.green.opacity(0.8))
+                        .foregroundColor(.white)
+                        .cornerRadius(8)
+                        .transition(.opacity)
+                }
+
                 Button("Cancel") {
                     if isNew { removeNewSchedule() }
                     onSave?()
                 }
                 .keyboardShortcut(.cancelAction)
-                Button("Save") {
+                Button("Done") {
                     saveSchedule()
                     onSave?()
                 }
@@ -409,6 +461,44 @@ struct ScheduleEditorView: View {
             }
         } message: {
             Text("Are you sure you want to delete \"\(name)\"? This cannot be undone.")
+        }
+    }
+
+    private func debounceSave() {
+        saveDebounce?.invalidate()
+        saveDebounce = Timer.scheduledTimer(withTimeInterval: 0.6, repeats: false) { _ in
+            saveSchedule()
+            withAnimation {
+                showSavedPill = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                withAnimation {
+                    showSavedPill = false
+                }
+            }
+        }
+    }
+
+    private func testSlackChannel() {
+        guard let notifier = slackNotifier else {
+            slackTestResult = "No webhook"
+            slackTestOK = false
+            return
+        }
+        slackTesting = true
+        slackTestResult = nil
+        Task {
+            let channel = slackChannel.isEmpty ? nil : slackChannel
+            let error = await notifier.testChannel(channel)
+            await MainActor.run {
+                slackTesting = false
+                slackTestOK = error == nil
+                slackTestResult = error ?? "Sent"
+                // Clear result after a few seconds
+                DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
+                    slackTestResult = nil
+                }
+            }
         }
     }
 
@@ -437,6 +527,7 @@ struct ScheduleEditorView: View {
         promptFile = s.promptFile
         enabled = s.enabled
         newConversation = s.options.newConversation ?? true
+        slackChannel = s.options.slackChannel ?? ""
         let days = Set(s.schedule.daysOfWeek ?? [])
         mon = days.contains("mon")
         tue = days.contains("tue")
@@ -481,6 +572,7 @@ struct ScheduleEditorView: View {
         config.schedules[idx].schedule.time = time
         config.schedules[idx].schedule.daysOfWeek = days.isEmpty ? nil : days
         config.schedules[idx].options.newConversation = newConversation
+        config.schedules[idx].options.slackChannel = slackChannel.isEmpty ? nil : slackChannel
 
         configManager.config = config
         configManager.save()

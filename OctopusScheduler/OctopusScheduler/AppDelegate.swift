@@ -388,6 +388,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             scheduleId: scheduleId,
             isNew: isNew,
             configManager: configManager,
+            slackNotifier: slackNotifier,
             onSave: { [weak self] in
                 self?.editorWindow?.close()
                 self?.schedulerEngine.restart()
@@ -425,9 +426,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func runNow(_ sender: NSMenuItem) {
         guard let scheduleId = sender.representedObject as? String else { return }
-        let scheduleName = configManager.config?.schedules.first(where: { $0.id == scheduleId })?.name ?? scheduleId
 
-        // Flash the menu bar icon to signal activity
+        // Show activity in menu bar immediately
         if let button = statusItem.button {
             button.title = "⏳"
         }
@@ -436,10 +436,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self?.schedulerEngine.executeNow(scheduleId: scheduleId)
             DispatchQueue.main.async {
                 self?.rebuildMenu()
-                self?.notificationService.notify(
-                    title: "OctopusScheduler",
-                    body: "\(scheduleName) — sent to Claude"
-                )
             }
         }
     }
