@@ -1,28 +1,50 @@
 import SwiftUI
 
+enum SettingsTab: String, CaseIterable {
+    case general = "General"
+    case schedules = "Schedules"
+    case notifications = "Notifications"
+    case help = "Help"
+    case about = "About"
+}
+
 struct SettingsView: View {
     @ObservedObject var configManager: ConfigManager
     @ObservedObject var schedulerEngine: SchedulerEngine
     var onSave: (() -> Void)?
+    @State private var selectedTab: SettingsTab = .general
 
     var body: some View {
-        TabView {
-            GeneralSettingsView(configManager: configManager, schedulerEngine: schedulerEngine, onSave: onSave)
-                .tabItem { Label("General", systemImage: "gear") }
+        VStack(spacing: 0) {
+            Picker("", selection: $selectedTab) {
+                ForEach(SettingsTab.allCases, id: \.self) { tab in
+                    Text(tab.rawValue).tag(tab)
+                }
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal)
+            .padding(.top, 12)
+            .padding(.bottom, 8)
 
-            SchedulesSettingsView(configManager: configManager, schedulerEngine: schedulerEngine)
-                .tabItem { Label("Schedules", systemImage: "clock") }
+            Divider()
 
-            NotificationsSettingsView(configManager: configManager, schedulerEngine: schedulerEngine, onSave: onSave)
-                .tabItem { Label("Notifications", systemImage: "bell") }
-
-            HelpView()
-                .tabItem { Label("Help", systemImage: "questionmark.circle") }
-
-            AboutView()
-                .tabItem { Label("About", systemImage: "info.circle") }
+            Group {
+                switch selectedTab {
+                case .general:
+                    GeneralSettingsView(configManager: configManager, schedulerEngine: schedulerEngine, onSave: onSave)
+                case .schedules:
+                    SchedulesSettingsView(configManager: configManager, schedulerEngine: schedulerEngine)
+                case .notifications:
+                    NotificationsSettingsView(configManager: configManager, schedulerEngine: schedulerEngine, onSave: onSave)
+                case .help:
+                    HelpView()
+                case .about:
+                    AboutView()
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(width: 520, height: 420)
+        .frame(width: 540, height: 440)
     }
 }
 
