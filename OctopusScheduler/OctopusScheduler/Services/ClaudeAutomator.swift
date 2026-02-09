@@ -17,7 +17,7 @@ class ClaudeAutomator: ObservableObject {
     }
 
     var isClaudeInstalled: Bool {
-        NSWorkspace.shared.urlForApplication(withBundleIdentifier: Self.claudeBundleID) != nil
+        NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.anthropic.claudefordesktop") != nil
     }
 
     func checkHealth() {

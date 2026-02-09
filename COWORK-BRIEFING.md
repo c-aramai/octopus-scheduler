@@ -1,114 +1,100 @@
-# OctopusScheduler — Build Session Briefing
+# OctopusScheduler — Decision Briefing: Prompt Delivery Method
 
-**Date:** 2026-02-04 ~1:55 AM - 3:10 AM EST
-**Participants:** wcs + Claude Code (Opus 4.5)
+**Date:** 2026-02-08
+**From:** logos-ui session (Opus 4.6)
+**For:** Cowork + Project sessions
 **Repo:** https://github.com/c-aramai/octopus-scheduler
+**Current version:** v1.4.0
 
-## What We Built
+## Context
 
-OctopusScheduler is now a working macOS menu bar app. It lives at:
+Sprint 1 "Bulletproof Foundation" shipped tonight (commit `c09d881`, tag `v1.4.0`). Six reliability features added — state persistence, retry with backoff, sleep/wake recovery, Claude health check, execution locking, config file watching. All working.
 
-```
-~/ARAMAI/dev/octopus-scheduler/OctopusScheduler/
-```
+However, during testing we hit a blocking issue with the **prompt delivery mechanism** — the AppleScript-based automation that sends prompts to Claude Desktop.
 
-The app automates Claude Desktop on a schedule — it reads prompt templates from markdown files, and at configured times (or on-demand via "Run Now"), it activates Claude, opens a new conversation, pastes the prompt, and submits it.
+## The Problem
 
-## What Happened
-
-### Phase 1: Initial Build
-- Read SPEC.md, VISION.md, BUILD-PROMPT.md
-- Created all 11 Swift source files, Xcode project, Package.swift
-- Verified compilation with `swift build` (Xcode wasn't installed yet)
-- Created sample config at `~/.octopus-scheduler/config.json`
-- Created morning briefing prompt at `~/ARAMAI/prompts/scheduled/morning-briefing.md`
-
-### Phase 2: Xcode Build + Icon Fix
-- Xcode finished downloading; project built successfully with Cmd+R
-- Fixed menu bar icon: replaced SF Symbol grid with 🐙 emoji
-
-### Phase 3: Automation Debugging
-This was the most iterative part. The original AppleScript approach (setting clipboard via AppleScript string interpolation) didn't work with Claude Desktop's Electron UI.
-
-**Problems discovered and solved:**
-1. **Clipboard via AppleScript** — multi-line prompts with quotes/newlines broke the string escaping. **Fix:** Use Swift's `NSPasteboard` to set clipboard, AppleScript only does keystrokes.
-2. **Paste not landing in input field** — Claude Desktop is Electron-based; System Events keystrokes weren't reaching the text input. **Fix:** After Cmd+N, the cursor is already in the input field — no clicking needed.
-3. **Enter not submitting** — Initial click coordinates were hitting the file attachment area instead of the text input. **Fix:** Eliminated clicking entirely; after Cmd+N the input has focus, so paste + Enter works.
-4. **Screen Recording permission** — Reading window position/size triggers this extra permission. **Fix:** Removed all window geometry code since clicking is unnecessary.
-
-### Phase 4: Five Improvements
-After the core flow was working, implemented:
-
-1. **`newConversation: false` reliability** — When reusing an existing conversation, presses Escape to dismiss overlays and ensure focus before pasting.
-2. **Cold-start detection** — Uses `NSRunningApplication` to check if Claude is already running. Waits 5s for cold start vs 1s for warm.
-3. **Launch at Login** — Wired up `SMAppService.mainApp` (macOS 13+) to the `launchAtLogin` config option.
-4. **Notifications** — `UNUserNotificationCenter` notifications on prompt fire, success, and failure.
-5. **Disk logging** — Daily rotating log files at `~/.octopus-scheduler/logs/octopus-YYYY-MM-DD.log`.
-
-Updated the Xcode project (project.pbxproj) to include the two new service files. Verified build with both `swift build` and `xcodebuild`.
-
-## Current State
-
-**Working:**
-- 🐙 menu bar icon with schedule list, Run Now submenu, Settings, Sync Now, Quit
-- Morning Briefing and Evening Summary both tested manually via Run Now
-- Config loads/saves, schedules toggle on/off from menu
-- Settings window with General/Schedules/Notifications/About tabs + HTTP Server settings
-- Live Bridge status in menu bar (🟢 Connected / 🔴 Disconnected / ⚪ Not configured)
-- Peers Online section showing connected peers from Bridge network
-- "Sync Now" reloads config and refreshes Bridge status
-- Slack webhook notifications on prompt fire/success/failure (SlackNotifier)
-- HTTP trigger server on port 19840 (POST /trigger/:id, GET /status, GET /schedules, GET /history)
-- Execution history tracking (last 50 runs, exposed via HTTP /history)
-- "Check for Updates..." with update indicator in menu ("⬆ Update to vX.Y.Z...")
-- GitHub Releases: v1.2.0, v1.2.1, v1.3.0 tagged and published
-- Builds clean with both Xcode and xcodebuild
-
-**Not yet tested:**
-- Overnight scheduled execution (timers are set, just hasn't hit 6:00 AM yet)
-- Notification display
-- Log file output
-- Launch at Login across reboot
-
-## Key Design Decisions
-
-| Decision | Rationale |
-|----------|-----------|
-| NSPasteboard over AppleScript clipboard | Avoids all string escaping issues with multi-line prompts |
-| No click-to-focus | Eliminates Screen Recording permission requirement |
-| Cmd+N auto-focuses input | Proven by testing; Claude Desktop puts cursor in input after new conversation |
-| Escape before paste (non-new-convo) | Dismisses any overlays to ensure input field has focus |
-| Cold-start detection | Prevents race condition where paste fires before Claude's UI is ready |
-
-## Files Created/Modified
+`ClaudeAutomator.swift` sends prompts to Claude Desktop via AppleScript keystrokes:
 
 ```
-~/.octopus-scheduler/config.json              # Runtime config (schedules + bridge URL)
-~/ARAMAI/prompts/scheduled/morning-briefing.md # Sample prompt template
-~/ARAMAI/dev/octopus-scheduler/SPEC-v2.md      # Updated specification
-~/ARAMAI/dev/octopus-scheduler/OctopusScheduler/  # Full project (18 source files)
-~/ARAMAI/dev/octopus-scheduler/dist/OctopusScheduler-v1.3.0.zip  # Distribution package
-~/ARAMAI/dev/octopus-scheduler/docs/RELEASING.md  # Release process documentation
+Activate Claude → Cmd+N (new conversation) → NSPasteboard copy → Cmd+V (paste) → Enter (submit)
 ```
 
-## Permissions Required (For New Installs)
+**Failure mode observed tonight:**
+1. Claude Desktop activates (switches to foreground) ✓
+2. Cmd+N / paste / Enter — **silently fails** ✗
+3. Retry logic fires 3 more times — all fail the same way
+4. Result: Claude is open but nothing was sent
 
-Only 3 permissions needed (down from 4 — eliminated Screen Recording):
-1. **Accessibility** — toggle once in System Settings
-2. **Automation: Claude** — one-time OK dialog
-3. **Automation: System Events** — one-time OK dialog
+**Root cause:** macOS Accessibility permission is invalidated every time the binary is rebuilt (code signature changes). The app must be re-authorized in System Settings > Privacy & Security > Accessibility after every build. Even after re-authorizing, the paste step still failed in testing.
 
-## Next Steps
+**This is inherently fragile because:**
+- Depends on macOS Accessibility permissions (revoked on rebuild)
+- Depends on Claude Desktop's Electron UI layout not changing
+- Keystroke timing is guesswork (fixed delays between steps)
+- No feedback — can't tell if paste landed or Enter submitted
+- Screen focus race conditions with other apps
 
-- Distribute v1.3.0 package to Mariam (update from v1.2.0)
-- Verify overnight scheduled execution fires correctly
-- Test Slack webhook delivery end-to-end with n8n
-- Test HTTP trigger from external automation (n8n, curl)
-- Wire up MCP Bridge handoff on prompt fire (Phase 4.5)
+## Options
 
-## Repository
+### Option A: Fix AppleScript (patch current approach)
 
-Public repo created at https://github.com/c-aramai/octopus-scheduler
-- Branch: `main`
-- 26 files, 2,511 lines
-- Includes specs (SPEC.md, SPEC-v2.md, VISION.md), build prompt, and full source
+Debug the specific paste failure, add longer delays, possibly use AXUIElement APIs for more reliable UI targeting.
+
+- **Pro:** Minimal code change, keeps Claude Desktop as the interface
+- **Con:** Still fragile. Every Claude Desktop update could break it. Accessibility re-auth on every rebuild. No way to verify delivery.
+
+### Option B: `claude` CLI with `--print` mode (recommended)
+
+Replace AppleScript with a shell call to the Claude Code CLI:
+
+```swift
+// Instead of AppleScript keystrokes:
+let process = Process()
+process.executableURL = URL(fileURLWithPath: "/opt/homebrew/bin/claude")
+process.arguments = ["-p", "--print", prompt]
+```
+
+- **Pro:** Already installed (`claude` 2.1.37 on this machine). No UI automation. No Accessibility permission needed. Runs headless. Returns response text. Works through API — completely reliable.
+- **Con:** Uses Claude Code API credits (not free-tier Claude Desktop). Loses the visual "conversation in Claude Desktop" that the user sees. Different model context (no MCP servers, no project knowledge unless configured).
+- **Consideration:** Can pass `--model`, `--allowedTools`, `--add-dir`, `--mcp-config` flags to configure context. Could also use `--continue` to maintain conversation state across runs.
+
+### Option C: Anthropic API direct
+
+Call the Anthropic API directly from Swift using URLSession, bypassing both Claude Desktop and Claude Code CLI.
+
+- **Pro:** Maximum control and reliability. No external dependencies.
+- **Con:** Requires API key management in config. Most code to write. Same credit cost as Option B. No tool use or MCP without building it ourselves.
+
+### Option D: MCP (not viable)
+
+Claude Desktop is an MCP *client* — it connects to MCP servers for tools/resources. There's no way to push a prompt into Claude Desktop via MCP. Wrong architecture for this use case.
+
+## Recommendation
+
+**Option B (`claude -p`)** — best reliability-to-effort ratio:
+
+1. Replace `sendPromptToClaude()` internals with `Process()` call to `claude -p`
+2. Capture stdout as the response (enables future response handling)
+3. Remove all AppleScript/System Events code
+4. Remove Accessibility permission requirement
+5. Keep `activateClaude` config option — if true, also `open -a Claude` for visibility
+
+The change is ~30 lines in `ClaudeAutomator.swift`. Everything else (retry, locking, state persistence, health check) works unchanged.
+
+## What Still Works
+
+All Sprint 1 features are confirmed operational:
+- State persistence (state.json created after successful fire)
+- Retry logic (4 attempts with 5s/15s/45s backoff — verified in logs)
+- Sleep/wake recovery (wired up, needs sleep cycle to test)
+- Claude health check (menu shows status, blocks when not installed)
+- Execution locking (prevents duplicate runs)
+- Config file watching (auto-reloads on external edit)
+
+## Decision Needed
+
+Which prompt delivery method should we implement? This affects:
+- Whether OctopusScheduler uses API credits or free Claude Desktop
+- Whether prompts appear visually in Claude Desktop
+- Long-term maintenance burden
