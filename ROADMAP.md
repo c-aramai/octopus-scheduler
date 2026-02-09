@@ -5,49 +5,37 @@
 
 ---
 
-## Phase 2: Reliability & Robustness
+## Phase 2: Reliability & Robustness ✅
 
-*Make it bulletproof for daily use.*
+*Make it bulletproof for daily use.* **COMPLETE (v1.4.0)**
 
-### 2.1 Sleep/Wake Recovery
-- **Problem:** Timers don't fire when Mac is asleep; missed schedules are lost
-- **Solution:**
-  - On wake (`NSWorkspace.didWakeNotification`), check all schedules for missed fires
-  - If `lastFired + interval < now`, execute immediately with `[DELAYED]` flag
-  - Store `lastFiredAt` timestamp per schedule in config
-- **Effort:** Small
+### 2.1 Sleep/Wake Recovery ✅
+- **Implemented:** `NSWorkspace.didWakeNotification` observer in `SchedulerEngine.startWakeObserver()`
+- Checks all enabled schedules for missed fires on wake
+- Fires missed schedules with `[DELAYED]` flag
+- State persisted to `~/.octopus-scheduler/state.json` (ISO8601 dates)
 
-### 2.2 Retry Logic with Backoff
-- **Problem:** Transient failures (Claude not responding, accessibility hiccup) cause permanent miss
-- **Solution:**
-  - On failure, retry up to 3 times with exponential backoff (5s, 15s, 45s)
-  - Log each attempt with failure reason
-  - Notification only after final failure
-- **Effort:** Small
+### 2.2 Retry Logic with Backoff ✅
+- **Implemented:** Retry loop in `executeWithRetry()` — 4 attempts (initial + 3 retries)
+- Backoff: 5s, 15s, 45s exponential
+- Health check and prompt load are non-retriable (correct)
+- Notification only after final failure
 
-### 2.3 Claude Health Check
-- **Problem:** Automation fails silently if Claude Desktop isn't installed or crashed
-- **Solution:**
-  - Pre-flight check: `NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.anthropic.claudefordesktop")`
-  - If missing/crashed, skip execution with clear error, don't retry
-  - Surface status in menu bar (🐙 vs ⚠️)
-- **Effort:** Small
+### 2.3 Claude Health Check ✅
+- **Implemented:** `ClaudeAutomator.checkHealth()` with 3-state enum (ready/notRunning/notInstalled)
+- Bundle ID lookup via `NSWorkspace`
+- Polled every 30s, menu bar icon: 🐙 (ok) / ⚠️ (not installed)
+- Pre-flight check skips execution if not installed (non-retriable)
 
-### 2.4 Config File Watching
-- **Problem:** Must manually "Reload Config" after editing JSON
-- **Solution:**
-  - `DispatchSource.makeFileSystemObjectSource` on config.json
-  - Auto-reload and reschedule on change
-  - Validate JSON before applying (don't break on syntax errors)
-- **Effort:** Small
+### 2.4 Config File Watching ✅
+- **Implemented:** `ConfigManager.startWatching()` using `DispatchSource.makeFileSystemObjectSource`
+- Watches `.write`, `.rename`, `.delete` events
+- 0.5s debounce, validates JSON before applying (invalid keeps current config)
 
-### 2.5 Execution Locking
-- **Problem:** If a prompt takes long, next schedule might overlap
-- **Solution:**
-  - Per-schedule mutex; skip if already running
-  - Global option: `allowConcurrentExecutions: false` (default)
-  - Log skipped executions
-- **Effort:** Small
+### 2.5 Execution Locking ✅
+- **Implemented:** `runningSchedules: Set<String>` in `SchedulerEngine`
+- Per-schedule mutex + global `allowConcurrentExecutions` config flag (default: false)
+- `defer` ensures cleanup on all exit paths
 
 ---
 
@@ -190,14 +178,16 @@
   - Abort chain on step failure (configurable)
 - **Effort:** Large
 
-### 5.4 Claude Code Support
-- **Problem:** Only works with Claude Desktop
+### 5.4 Claude Code Support ← **EVALUATING (see COWORK-BRIEFING.md)**
+- **Problem:** AppleScript automation for Claude Desktop is unreliable (Accessibility perms revoked on rebuild, silent keystroke failures)
 - **Solution:**
-  - Detect Claude Code CLI: `which claude`
-  - Alternative execution mode: `claude --print` or pipe to stdin
+  - Replace AppleScript with `claude -p --print` CLI call
+  - Already installed (`/opt/homebrew/bin/claude` v2.1.37)
+  - No UI automation, no Accessibility permission needed
+  - Returns response text (enables response capture for free)
   - Per-schedule option: `"target": "desktop" | "cli"`
-  - CLI mode: capture stdout as response (easier than UI scraping)
-- **Effort:** Medium
+- **Status:** Decision pending — briefing sent to Cowork/Project sessions
+- **Effort:** Small (~30 lines in ClaudeAutomator.swift)
 
 ### 5.5 Multiple Profiles
 - **Problem:** Single Claude conversation context
@@ -231,11 +221,11 @@
 
 | Feature | Impact | Effort | Priority |
 |---------|--------|--------|----------|
-| Sleep/Wake Recovery | High | Small | **P0** |
-| Retry Logic | High | Small | **P0** |
-| Claude Health Check | Medium | Small | **P0** |
-| Config File Watching | Medium | Small | **P0** |
-| Execution Locking | Medium | Small | **P0** |
+| ~~Sleep/Wake Recovery~~ | ~~High~~ | ~~Small~~ | ✅ **v1.3.0** |
+| ~~Retry Logic~~ | ~~High~~ | ~~Small~~ | ✅ **v1.3.0** |
+| ~~Claude Health Check~~ | ~~Medium~~ | ~~Small~~ | ✅ **v1.3.0** |
+| ~~Config File Watching~~ | ~~Medium~~ | ~~Small~~ | ✅ **v1.3.0** |
+| ~~Execution Locking~~ | ~~Medium~~ | ~~Small~~ | ✅ **v1.3.0** |
 | ~~Webhook Events (Out)~~ | ~~High~~ | ~~Small~~ | ✅ **v1.3.0** |
 | Cron Schedules | Medium | Small | **P1** |
 | Template Inheritance | Medium | Small | **P1** |
@@ -243,7 +233,7 @@
 | Execution History | High | Medium | **P1** |
 | ~~Webhook Triggers (In)~~ | ~~High~~ | ~~Medium~~ | ✅ **v1.3.0** |
 | MCP Bridge Integration | High | Medium | **P2** |
-| Claude Code Support | High | Medium | **P2** |
+| Claude Code Support | **Critical** | Small | **P0 — evaluating** |
 | Conditional Execution | Medium | Medium | **P2** |
 | Prompt Template Browser | Medium | Medium | **P2** |
 | Status Dashboard | Medium | Medium | **P2** |
@@ -257,30 +247,34 @@
 
 ## Suggested Sprints
 
-### Sprint 1: Bulletproof Foundation (P0)
-- Sleep/wake recovery
-- Retry with backoff
-- Claude health check
-- Config file watching
-- Execution locking
+### Sprint 1: Bulletproof Foundation (P0) ✅ COMPLETE
+- ~~Sleep/wake recovery~~ ✅
+- ~~Retry with backoff~~ ✅
+- ~~Claude health check~~ ✅
+- ~~Config file watching~~ ✅
+- ~~Execution locking~~ ✅
+
+### Sprint 1.5: Prompt Delivery Fix (P0) ← NEXT
+- Claude Code CLI support (`claude -p`) — replaces fragile AppleScript
+- Decision pending: see COWORK-BRIEFING.md
 
 ### Sprint 2: Observable & Flexible (P1)
-- Webhook events outbound
 - Cron-style schedules
 - Template inheritance
 - Execution history (SQLite)
+- Visual schedule editor
 
 ### Sprint 3: Integration Layer (P2)
-- Webhook triggers inbound
-- MCP Bridge integration
-- Claude Code support
+- MCP Bridge integration (full handoff)
 - Conditional execution
+- Prompt template browser
+- Status dashboard
 
 ### Sprint 4: Power Features (P3-P4)
-- Visual schedule editor
 - Response capture
-- Slack integration
 - Prompt chaining
+- Remote prompt repo
+- Multiple profiles
 
 ---
 

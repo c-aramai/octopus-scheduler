@@ -1,106 +1,56 @@
-# OctopusScheduler - Launch Instructions
+# OctopusScheduler — Quick Reference
 
-## Claude Code Launch Command
+**Current version:** v1.4.0 (build 5)
+**Repo:** https://github.com/c-aramai/octopus-scheduler
 
-Open Terminal and run:
-
-```bash
-cd ~/ARAMAI/dev/octopus-scheduler && claude --dangerously-skip-permissions
-```
-
-### What `--dangerously-skip-permissions` does:
-- Skips all permission prompts (file writes, bash commands, etc.)
-- Allows Claude to work autonomously without human confirmation
-- **Use only in trusted contexts** (like building your own app overnight)
-
-### Alternative: Allowlist specific permissions
-
-If you prefer more control:
+## Build & Run
 
 ```bash
-cd ~/ARAMAI/dev/octopus-scheduler && claude \
-  --allowedTools "Write,Edit,Bash,Read,Glob,Grep" \
-  --prompt "Read BUILD-PROMPT.md and build the complete OctopusScheduler application"
-```
+cd ~/ARAMAI/dev/octopus-scheduler/OctopusScheduler
 
-## Full One-Liner
-
-Copy this entire command to start the build:
-
-```bash
-cd ~/ARAMAI/dev/octopus-scheduler && claude --dangerously-skip-permissions "Read BUILD-PROMPT.md and follow all instructions to build the complete OctopusScheduler macOS application. Create all files, the Xcode project, and verify it compiles with xcodebuild."
-```
-
-## Quick Install (v1.2.0 Distribution Package)
-
-For pre-built distribution:
-
-1. **Unzip** `OctopusScheduler/build/dist/OctopusScheduler-v1.2.0.zip`
-2. **Drag** `OctopusScheduler.app` to Applications
-3. **Right-click → Open** (first launch bypasses Gatekeeper)
-4. **Copy config:**
-   ```bash
-   mkdir -p ~/.octopus-scheduler
-   cp config/default-config.json ~/.octopus-scheduler/config.json
-   ```
-5. **Copy prompts:**
-   ```bash
-   mkdir -p ~/ARAMAI/prompts/scheduled
-   cp prompts/*.md ~/ARAMAI/prompts/scheduled/
-   ```
-6. **Grant Accessibility Permission** when macOS prompts
-7. **Test**: Click the 🐙 menu bar icon → verify Bridge status shows green
-
-## After Build Completes
-
-1. **Open Xcode**:
-   ```bash
-   open ~/ARAMAI/dev/octopus-scheduler/OctopusScheduler/OctopusScheduler.xcodeproj
-   ```
-
-2. **Build & Run** (Cmd+R in Xcode)
-
-3. **Grant Accessibility Permission** when macOS prompts
-
-4. **Create config** (if not present):
-   ```bash
-   mkdir -p ~/.octopus-scheduler
-   cp OctopusScheduler/build/dist/OctopusScheduler-v1.2.0/config/default-config.json ~/.octopus-scheduler/config.json
-   ```
-
-5. **Test**: Click the 🐙 menu bar icon → Run Now → Morning Briefing
-
-## Monitoring the Build
-
-In another Terminal window, you can watch progress:
-
-```bash
-# Watch the directory for new files
-watch -n 2 'find ~/ARAMAI/dev/octopus-scheduler -name "*.swift" | wc -l'
-
-# Or tail Claude's output if logging
-tail -f ~/ARAMAI/dev/octopus-scheduler/build.log
-```
-
-## Troubleshooting
-
-### Build fails with signing error
-```bash
-# Build without signing for local use
+# Build release
 xcodebuild -project OctopusScheduler.xcodeproj \
   -scheme OctopusScheduler \
-  -configuration Debug \
-  CODE_SIGN_IDENTITY="" \
-  CODE_SIGNING_REQUIRED=NO
+  -configuration Release build \
+  CONFIGURATION_BUILD_DIR=./build/release
+
+# Launch
+open build/release/OctopusScheduler.app
 ```
 
-### Missing Xcode command line tools
+## Kill & Restart
+
 ```bash
-xcode-select --install
+pkill -f "build/release/OctopusScheduler"; sleep 1
+open ~/ARAMAI/dev/octopus-scheduler/OctopusScheduler/build/release/OctopusScheduler.app
 ```
 
-### Claude Code not found
+## Config & State
+
+| File | Purpose |
+|------|---------|
+| `~/.octopus-scheduler/config.json` | User config (schedules, options, bridge, slack) |
+| `~/.octopus-scheduler/state.json` | Machine state (lastFiredAt timestamps) |
+| `~/.octopus-scheduler/logs/` | Daily rotating logs |
+
+## Permissions Required
+
+1. **Accessibility** — System Settings > Privacy & Security > Accessibility > add OctopusScheduler.app
+2. **Automation: Claude** — one-time OK dialog
+3. **Automation: System Events** — one-time OK dialog
+
+Note: Accessibility permission is invalidated on every rebuild (code signature changes). Must re-authorize after each build.
+
+## Monitoring
+
 ```bash
-# Install Claude Code
-npm install -g @anthropic-ai/claude-code
+# Watch logs live
+tail -f ~/.octopus-scheduler/logs/octopus-$(date +%Y-%m-%d).log
+
+# Check state
+cat ~/.octopus-scheduler/state.json
 ```
+
+## Known Issue
+
+AppleScript prompt delivery is unreliable — activates Claude Desktop but keystrokes (paste/enter) often fail silently. Evaluating switch to `claude -p` CLI. See `COWORK-BRIEFING.md` for decision.
