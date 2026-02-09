@@ -185,7 +185,7 @@ class SchedulerEngine: ObservableObject {
         let maxAttempts = 1 + backoff.count
 
         for attempt in 1...maxAttempts {
-            let success = claudeAutomator?.sendPromptToClaude(renderedPrompt, newConversation: newConversation) ?? false
+            let success = claudeAutomator?.sendPrompt(renderedPrompt, newConversation: newConversation) ?? false
             if success {
                 logService?.log("\(prefix)'\(schedule.name)' sent successfully")
                 notificationService?.notify(title: "OctopusScheduler", body: "\(prefix)\(schedule.name) sent to Claude")

@@ -10,6 +10,7 @@ class ClaudeAutomator: ObservableObject {
     private static let claudeBundleID = "com.anthropic.claude"
 
     @Published var status: ClaudeStatus = .notRunning
+    var cliPath: String = "/opt/homebrew/bin/claude"
 
     /// Whether Claude Desktop is currently running.
     private var isClaudeRunning: Bool {
@@ -21,15 +22,48 @@ class ClaudeAutomator: ObservableObject {
     }
 
     func checkHealth() {
-        if !isClaudeInstalled { status = .notInstalled }
-        else if isClaudeRunning { status = .ready }
+        let cliAvailable = FileManager.default.isExecutableFile(atPath: cliPath)
+        if !isClaudeInstalled && !cliAvailable { status = .notInstalled }
+        else if isClaudeRunning || cliAvailable { status = .ready }
         else { status = .notRunning }
+    }
+
+    /// Primary entry point: tries CLI first, falls back to AppleScript.
+    @discardableResult
+    func sendPrompt(_ prompt: String, newConversation: Bool = true) -> Bool {
+        if FileManager.default.isExecutableFile(atPath: cliPath) {
+            print("[ClaudeAutomator] Trying CLI delivery...")
+            if sendPromptViaCLI(prompt) {
+                print("[ClaudeAutomator] CLI delivery succeeded")
+                return true
+            }
+            print("[ClaudeAutomator] CLI failed, falling back to AppleScript")
+        }
+        return sendPromptViaAppleScript(prompt, newConversation: newConversation)
+    }
+
+    /// Sends a prompt via `claude -p --print`.
+    @discardableResult
+    func sendPromptViaCLI(_ prompt: String) -> Bool {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: cliPath)
+        process.arguments = ["-p", "--print", prompt]
+        process.standardOutput = Pipe()
+        process.standardError = Pipe()
+        do {
+            try process.run()
+            process.waitUntilExit()
+            return process.terminationStatus == 0
+        } catch {
+            print("[ClaudeAutomator] CLI error: \(error)")
+            return false
+        }
     }
 
     /// Sends a prompt to Claude Desktop via AppleScript automation.
     /// Uses NSPasteboard for clipboard to avoid AppleScript string escaping issues.
     @discardableResult
-    func sendPromptToClaude(_ prompt: String, newConversation: Bool = true) -> Bool {
+    func sendPromptViaAppleScript(_ prompt: String, newConversation: Bool = true) -> Bool {
         let wasRunning = isClaudeRunning
 
         // 1. Activate Claude (launches it if not running)

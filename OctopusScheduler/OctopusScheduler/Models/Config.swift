@@ -34,6 +34,7 @@ struct GlobalOptions: Codable {
     var showNotifications: Bool
     var logDirectory: String?
     var allowConcurrentExecutions: Bool?
+    var claudeCLIPath: String?
 }
 
 struct BridgeConfig: Codable {

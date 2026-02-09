@@ -3,6 +3,12 @@ import Combine
 import ServiceManagement
 import SwiftUI
 
+/// NSWindow subclass that accepts key events in menu-bar (agent) apps.
+private class KeyableWindow: NSWindow {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { true }
+}
+
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     let configManager = ConfigManager()
@@ -17,6 +23,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var bridgeCancellable: AnyCancellable?
     private var claudeCancellable: AnyCancellable?
     private var updateAvailableVersion: String?
+    private var settingsWindow: NSWindow?
+    private var editorWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupMenuBar()
@@ -30,6 +38,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         slackNotifier.configure(slackConfig: config.slack)
         configureLaunchAtLogin(enabled: config.globalOptions.launchAtLogin)
 
+        // Wire CLI path from config
+        if let cliPath = config.globalOptions.claudeCLIPath {
+            claudeAutomator.cliPath = cliPath
+        }
+
         schedulerEngine.configure(
             configManager: configManager,
             promptLoader: promptLoader,
@@ -38,6 +51,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             logService: logService,
             slackNotifier: slackNotifier
         )
+
+        // CLI setup wizard — show once if CLI not found
+        if !FileManager.default.isExecutableFile(atPath: claudeAutomator.cliPath) {
+            showCLISetupWizard()
+        }
+
         schedulerEngine.start()
 
         // Bridge service
@@ -115,6 +134,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         notificationService.configure(enabled: config.globalOptions.showNotifications)
         slackNotifier.configure(slackConfig: config.slack)
         bridgeService.configure(bridgeUrl: config.bridge?.url)
+        if let cliPath = config.globalOptions.claudeCLIPath {
+            claudeAutomator.cliPath = cliPath
+        }
         schedulerEngine.restart()
         rebuildMenu()
     }
@@ -136,70 +158,123 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(headerItem)
 
         // Connection status (live)
-        let statusText: String
+        let bridgeOK = bridgeService.status == .connected
+        let bridgeText: String
         switch bridgeService.status {
-        case .connected:
-            statusText = "🟢 Connected to Bridge"
-        case .disconnected:
-            statusText = "🔴 Bridge disconnected"
-        case .notConfigured:
-            statusText = "⚪ Bridge not configured"
+        case .connected:    bridgeText = "🟢 Connected to Bridge"
+        case .disconnected: bridgeText = "🔴 Bridge disconnected"
+        case .notConfigured: bridgeText = "⚪ Bridge not configured"
         }
-        let bridgeStatusItem = NSMenuItem(title: statusText, action: nil, keyEquivalent: "")
+        let bridgeStatusItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        bridgeStatusItem.attributedTitle = styledStatus(bridgeText, active: bridgeOK)
         bridgeStatusItem.isEnabled = false
         menu.addItem(bridgeStatusItem)
 
-        // Claude Desktop status
+        // Claude status
+        let claudeOK = claudeAutomator.status == .ready
         let claudeText: String
         switch claudeAutomator.status {
-        case .ready:
-            claudeText = "🟢 Claude Desktop ready"
-        case .notRunning:
-            claudeText = "🟡 Claude Desktop not running"
-        case .notInstalled:
-            claudeText = "❌ Claude Desktop not installed"
+        case .ready:        claudeText = "🟢 Claude ready"
+        case .notRunning:   claudeText = "🟡 Claude Desktop not running"
+        case .notInstalled: claudeText = "❌ Claude not available"
         }
-        let claudeStatusItem = NSMenuItem(title: claudeText, action: nil, keyEquivalent: "")
+        let claudeStatusItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        claudeStatusItem.attributedTitle = styledStatus(claudeText, active: claudeOK)
         claudeStatusItem.isEnabled = false
         menu.addItem(claudeStatusItem)
 
         menu.addItem(NSMenuItem.separator())
 
-        // Active workflows
-        let active = schedules.filter { $0.enabled }
-        let paused = schedules.filter { !$0.enabled }
-
-        if active.isEmpty && paused.isEmpty {
+        // Workflows
+        if schedules.isEmpty {
             let item = NSMenuItem(title: "No schedules configured", action: nil, keyEquivalent: "")
             item.isEnabled = false
             menu.addItem(item)
         } else {
-            if !active.isEmpty {
-                let activeHeader = NSMenuItem(title: "▶ Active Workflows (\(active.count))", action: nil, keyEquivalent: "")
-                activeHeader.isEnabled = false
-                menu.addItem(activeHeader)
-                for schedule in active {
-                    let nextStr = formatNextFire(schedule)
-                    let item = NSMenuItem(title: "    \(schedule.name) — next: \(nextStr)", action: #selector(toggleSchedule(_:)), keyEquivalent: "")
-                    item.target = self
-                    item.representedObject = schedule.id
-                    menu.addItem(item)
-                }
-            }
+            let workflowHeader = NSMenuItem(title: "Workflows", action: nil, keyEquivalent: "")
+            workflowHeader.isEnabled = false
+            menu.addItem(workflowHeader)
 
-            if !paused.isEmpty {
-                if !active.isEmpty { menu.addItem(NSMenuItem.separator()) }
-                let pausedHeader = NSMenuItem(title: "⏸ Paused (\(paused.count))", action: nil, keyEquivalent: "")
-                pausedHeader.isEnabled = false
-                menu.addItem(pausedHeader)
-                for schedule in paused {
-                    let item = NSMenuItem(title: "    \(schedule.name) — paused", action: #selector(toggleSchedule(_:)), keyEquivalent: "")
-                    item.target = self
-                    item.representedObject = schedule.id
-                    menu.addItem(item)
+            let promptsDir = config?.resolvedPromptsDirectory ?? ""
+
+            for schedule in schedules {
+                let icon = schedule.enabled ? "▶" : "⏸"
+                let item = NSMenuItem(title: "\(icon) \(schedule.name)", action: nil, keyEquivalent: "")
+
+                let sub = NSMenu()
+
+                // Info: schedule timing
+                let days = schedule.schedule.daysOfWeek?.joined(separator: ", ") ?? "daily"
+                let timeItem = NSMenuItem(title: "Schedule: \(schedule.schedule.time) · \(days)", action: nil, keyEquivalent: "")
+                timeItem.isEnabled = false
+                sub.addItem(timeItem)
+
+                // Info: next fire / status
+                if schedule.enabled {
+                    let nextStr = formatNextFire(schedule)
+                    let nextItem = NSMenuItem(title: "Next: \(nextStr)", action: nil, keyEquivalent: "")
+                    nextItem.isEnabled = false
+                    sub.addItem(nextItem)
+                } else {
+                    let pausedItem = NSMenuItem(title: "Status: paused", action: nil, keyEquivalent: "")
+                    pausedItem.isEnabled = false
+                    sub.addItem(pausedItem)
                 }
+
+                // Info: last run
+                if let lastRun = schedulerEngine.lastExecution[schedule.id] {
+                    let fmt = RelativeDateTimeFormatter()
+                    fmt.unitsStyle = .abbreviated
+                    let ago = fmt.localizedString(for: lastRun, relativeTo: Date())
+                    let lastItem = NSMenuItem(title: "Last run: \(ago)", action: nil, keyEquivalent: "")
+                    lastItem.isEnabled = false
+                    sub.addItem(lastItem)
+                }
+
+                // Info: prompt file
+                let fileItem = NSMenuItem(title: "Prompt: \(schedule.promptFile)", action: nil, keyEquivalent: "")
+                fileItem.isEnabled = false
+                sub.addItem(fileItem)
+
+                sub.addItem(NSMenuItem.separator())
+
+                // Action: Run Now
+                let runItem = NSMenuItem(title: "Run Now", action: #selector(runNow(_:)), keyEquivalent: "")
+                runItem.target = self
+                runItem.representedObject = schedule.id
+                sub.addItem(runItem)
+
+                // Action: Open Prompt
+                let promptPath = (promptsDir as NSString).appendingPathComponent(schedule.promptFile)
+                let openPromptItem = NSMenuItem(title: "Open Prompt...", action: #selector(openPromptFile(_:)), keyEquivalent: "")
+                openPromptItem.target = self
+                openPromptItem.representedObject = promptPath
+                sub.addItem(openPromptItem)
+
+                // Action: Edit Schedule
+                let editItem = NSMenuItem(title: "Edit Schedule...", action: #selector(editSchedule(_:)), keyEquivalent: "")
+                editItem.target = self
+                editItem.representedObject = schedule.id
+                sub.addItem(editItem)
+
+                sub.addItem(NSMenuItem.separator())
+
+                // Action: Pause / Resume
+                let toggleTitle = schedule.enabled ? "Pause" : "Resume"
+                let toggleItem = NSMenuItem(title: toggleTitle, action: #selector(toggleSchedule(_:)), keyEquivalent: "")
+                toggleItem.target = self
+                toggleItem.representedObject = schedule.id
+                sub.addItem(toggleItem)
+
+                item.submenu = sub
+                menu.addItem(item)
             }
         }
+
+        // New Workflow
+        let newWorkflowItem = NSMenuItem(title: "+ New Workflow...", action: #selector(addNewWorkflow), keyEquivalent: "n")
+        newWorkflowItem.target = self
+        menu.addItem(newWorkflowItem)
 
         // Peers Online
         if !bridgeService.peers.isEmpty {
@@ -213,25 +288,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 menu.addItem(item)
             }
         }
-
-        menu.addItem(NSMenuItem.separator())
-
-        // Run Now submenu
-        let runNowItem = NSMenuItem(title: "Run Now", action: nil, keyEquivalent: "")
-        let runNowSubmenu = NSMenu()
-        for schedule in schedules {
-            let item = NSMenuItem(title: schedule.name, action: #selector(runNow(_:)), keyEquivalent: "")
-            item.target = self
-            item.representedObject = schedule.id
-            runNowSubmenu.addItem(item)
-        }
-        if schedules.isEmpty {
-            let item = NSMenuItem(title: "No prompts available", action: nil, keyEquivalent: "")
-            item.isEnabled = false
-            runNowSubmenu.addItem(item)
-        }
-        runNowItem.submenu = runNowSubmenu
-        menu.addItem(runNowItem)
 
         menu.addItem(NSMenuItem.separator())
 
@@ -267,6 +323,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         self.statusItem.menu = menu
     }
 
+    private func styledStatus(_ text: String, active: Bool) -> NSAttributedString {
+        let color: NSColor = active ? .white : .disabledControlTextColor
+        return NSAttributedString(string: text, attributes: [.foregroundColor: color])
+    }
+
     private func formatNextFire(_ schedule: ScheduleConfig) -> String {
         guard let fireDate = schedule.nextFireDate() else { return "unknown" }
         let calendar = Calendar.current
@@ -286,6 +347,68 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    @objc private func openPromptFile(_ sender: NSMenuItem) {
+        guard let path = sender.representedObject as? String else { return }
+        let url = URL(fileURLWithPath: path)
+        if FileManager.default.fileExists(atPath: path) {
+            NSWorkspace.shared.open(url)
+        } else {
+            let alert = NSAlert()
+            alert.messageText = "Prompt file not found"
+            alert.informativeText = path
+            alert.runModal()
+        }
+    }
+
+    @objc private func addNewWorkflow() {
+        guard var config = configManager.config else { return }
+        let newId = UUID().uuidString.lowercased().prefix(8).description
+        let newSchedule = ScheduleConfig(
+            id: newId,
+            name: "New Workflow",
+            enabled: false,
+            promptFile: "new-workflow.md",
+            schedule: ScheduleTiming(type: "daily", time: "09:00", daysOfWeek: nil),
+            options: ScheduleOptions()
+        )
+        config.schedules.append(newSchedule)
+        configManager.config = config
+        configManager.save()
+        openEditorWindow(scheduleId: newId, title: "New Workflow", isNew: true)
+    }
+
+    @objc private func editSchedule(_ sender: NSMenuItem) {
+        guard let scheduleId = sender.representedObject as? String else { return }
+        let name = configManager.config?.schedules.first(where: { $0.id == scheduleId })?.name ?? "Schedule"
+        openEditorWindow(scheduleId: scheduleId, title: "Edit: \(name)", isNew: false)
+    }
+
+    private func openEditorWindow(scheduleId: String, title: String, isNew: Bool) {
+        let editorView = ScheduleEditorView(
+            scheduleId: scheduleId,
+            isNew: isNew,
+            configManager: configManager,
+            onSave: { [weak self] in
+                self?.editorWindow?.close()
+                self?.schedulerEngine.restart()
+                self?.rebuildMenu()
+            }
+        )
+        let window = KeyableWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 400, height: 380),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = title
+        window.contentView = NSHostingView(rootView: editorView)
+        window.center()
+        window.isReleasedWhenClosed = false
+        editorWindow = window
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
     @objc private func viewLogs() {
         let logDir = configManager.config?.globalOptions.logDirectory ?? "~/.octopus-scheduler/logs"
         let resolved = (logDir as NSString).expandingTildeInPath
@@ -302,11 +425,50 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func runNow(_ sender: NSMenuItem) {
         guard let scheduleId = sender.representedObject as? String else { return }
-        schedulerEngine.executeNow(scheduleId: scheduleId)
+        let scheduleName = configManager.config?.schedules.first(where: { $0.id == scheduleId })?.name ?? scheduleId
+
+        // Flash the menu bar icon to signal activity
+        if let button = statusItem.button {
+            button.title = "⏳"
+        }
+
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            self?.schedulerEngine.executeNow(scheduleId: scheduleId)
+            DispatchQueue.main.async {
+                self?.rebuildMenu()
+                self?.notificationService.notify(
+                    title: "OctopusScheduler",
+                    body: "\(scheduleName) — sent to Claude"
+                )
+            }
+        }
     }
 
     @objc private func openSettings() {
-        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+        if let window = settingsWindow {
+            window.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+        let settingsView = SettingsView(
+            configManager: configManager,
+            schedulerEngine: schedulerEngine,
+            onSave: { [weak self] in
+                self?.settingsWindow?.close()
+            }
+        )
+        let window = KeyableWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 520, height: 460),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = "OctopusScheduler Settings"
+        window.contentView = NSHostingView(rootView: settingsView)
+        window.center()
+        window.isReleasedWhenClosed = false
+        settingsWindow = window
+        window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
 
@@ -330,6 +492,33 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         str.draw(at: NSPoint(x: (size.width - strSize.width) / 2, y: (size.height - strSize.height) / 2))
         image.unlockFocus()
         return image
+    }
+
+    private func showCLISetupWizard() {
+        let alert = NSAlert()
+        alert.icon = makeAppIcon()
+        alert.messageText = "Claude CLI Not Found"
+        alert.informativeText = """
+            OctopusScheduler works best with Claude Code CLI for reliable prompt delivery.
+
+            Install it with:
+            npm install -g @anthropic-ai/claude-code
+
+            Without it, the app will fall back to AppleScript automation \
+            (less reliable, requires Accessibility permission).
+            """
+        alert.addButton(withTitle: "Install Now")
+        alert.addButton(withTitle: "Skip")
+
+        if alert.runModal() == .alertFirstButtonReturn {
+            let script = """
+                tell application "Terminal"
+                    activate
+                    do script "npm install -g @anthropic-ai/claude-code"
+                end tell
+                """
+            NSAppleScript(source: script)?.executeAndReturnError(nil)
+        }
     }
 
     @objc private func checkForUpdates() {
