@@ -11,8 +11,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private let promptLoader = PromptLoader()
     private let notificationService = NotificationService()
     private let logService = LogService()
+    private let slackNotifier = SlackNotifier()
     private let bridgeService = BridgeService()
+    private let httpServer = SchedulerHTTPServer()
     private var bridgeCancellable: AnyCancellable?
+    private var updateAvailableVersion: String?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupMenuBar()
@@ -22,6 +25,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let config = configManager.config ?? .defaultConfig
         logService.configure(logDirectory: config.globalOptions.logDirectory)
         notificationService.configure(enabled: config.globalOptions.showNotifications)
+        slackNotifier.configure(slackConfig: config.slack)
         configureLaunchAtLogin(enabled: config.globalOptions.launchAtLogin)
 
         schedulerEngine.configure(
@@ -29,7 +33,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             promptLoader: promptLoader,
             claudeAutomator: claudeAutomator,
             notificationService: notificationService,
-            logService: logService
+            logService: logService,
+            slackNotifier: slackNotifier
         )
         schedulerEngine.start()
 
@@ -40,8 +45,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             DispatchQueue.main.async { self?.rebuildMenu() }
         })
 
+        // HTTP server
+        if let httpConfig = config.http, httpConfig.enabled {
+            httpServer.start(config: httpConfig, schedulerEngine: schedulerEngine, configManager: configManager, logService: logService)
+        }
+
         // Silent update check
-        Task { await UpdateChecker.shared.checkForUpdates() }
+        Task {
+            await UpdateChecker.shared.checkForUpdates()
+            let version = await UpdateChecker.shared.updateAvailable ? await UpdateChecker.shared.latestVersion : nil
+            await MainActor.run {
+                self.updateAvailableVersion = version
+                self.rebuildMenu()
+            }
+        }
 
         logService.log("OctopusScheduler launched")
     }
@@ -195,7 +212,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(syncItem)
 
         // Check for Updates
-        let updateItem = NSMenuItem(title: "Check for Updates...", action: #selector(checkForUpdates), keyEquivalent: "u")
+        let updateTitle = updateAvailableVersion != nil
+            ? "⬆ Update to v\(updateAvailableVersion!)..."
+            : "Check for Updates..."
+        let updateItem = NSMenuItem(title: updateTitle, action: #selector(checkForUpdates), keyEquivalent: "u")
         updateItem.target = self
         menu.addItem(updateItem)
 
