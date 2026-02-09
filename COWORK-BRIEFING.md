@@ -1,9 +1,9 @@
 # OctopusScheduler — Sprint 1.5 Briefing
 
-**Date:** 2026-02-08
+**Date:** 2026-02-09
 **From:** logos-ui session (Opus 4.6)
 **Repo:** https://github.com/c-aramai/octopus-scheduler
-**Current version:** v1.5.0 (3 commits: bb9022c, 7e737d3, d7c6efd)
+**Current version:** v1.5.1 (release: https://github.com/c-aramai/octopus-scheduler/releases/tag/v1.5.1)
 
 ## What Shipped Tonight
 
@@ -41,12 +41,16 @@
 - Per-workflow `slackChannel` in schedule options (overrides global default)
 - Auto-strips `#` prefix from channel names
 
+## v1.5.1 Fixes (Feb 9)
+
+- **Slack webhook URL validation** — Settings warns with orange text when URL doesn't match `hooks.slack.com` format
+- **Notification permission feedback** — Notifications tab shows macOS authorization status (blocked, not requested, granted). Directs user to System Settings when blocked.
+- **Run Now progress** — Menu shows "Running: [workflow name] (Xs)" in yellow with elapsed time counter, updates every 5s, clears on completion
+
 ## Known Issues / Backlog
 
-1. **Slack webhook 404** — User's webhook URL returning 404. Needs investigation (likely expired webhook). The error is now shown cleanly as "Webhook URL not found — check Settings"
+1. **Slack webhook URL** — Config still points to `localhost:5679`. Needs a fresh Slack webhook from workspace admin.
 2. **Slack channel validation** — Test button works but depends on valid webhook URL first
-3. **macOS notification permission** — UNUserNotificationCenter may need explicit permission grant for unsigned builds
-4. **Run Now feedback** — Hourglass shows but takes 15-20s for CLI to complete. Consider progress indicator or estimated time
 
 ## Files Modified (from v1.4.0)
 
@@ -57,8 +61,9 @@
 | `Models/Schedule.swift` | `slackChannel` in ScheduleOptions |
 | `Services/SchedulerEngine.swift` | `sendPrompt()` call, channel passthrough |
 | `Services/SlackNotifier.swift` | Proper Slack format, per-channel, test method, friendly errors |
-| `Views/SettingsView.swift` | Segmented tabs, HelpView, ScheduleEditorView, auto-save, Slack test |
-| `AppDelegate.swift` | CLI wizard, KeyableWindow, menu overhaul, editor/new workflow actions |
+| `Views/SettingsView.swift` | Segmented tabs, HelpView, ScheduleEditorView, auto-save, Slack test, webhook validation, notification status |
+| `AppDelegate.swift` | CLI wizard, KeyableWindow, menu overhaul, editor/new workflow actions, Run Now progress |
+| `Services/NotificationService.swift` | ObservableObject with published authorization status |
 
 ## Architecture Notes for Next Session
 
