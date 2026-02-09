@@ -1,100 +1,68 @@
-# OctopusScheduler — Decision Briefing: Prompt Delivery Method
+# OctopusScheduler — Sprint 1.5 Briefing
 
 **Date:** 2026-02-08
 **From:** logos-ui session (Opus 4.6)
-**For:** Cowork + Project sessions
 **Repo:** https://github.com/c-aramai/octopus-scheduler
-**Current version:** v1.4.0
+**Current version:** v1.5.0 (3 commits: bb9022c, 7e737d3, d7c6efd)
 
-## Context
+## What Shipped Tonight
 
-Sprint 1 "Bulletproof Foundation" shipped tonight (commit `c09d881`, tag `v1.4.0`). Six reliability features added — state persistence, retry with backoff, sleep/wake recovery, Claude health check, execution locking, config file watching. All working.
+### Dual-Mode Prompt Delivery
+- **Primary:** Claude Code CLI (`claude -p --print`) — headless, reliable, no Accessibility permission needed
+- **Fallback:** AppleScript automation (original method, kept for machines without CLI)
+- `sendPrompt()` tries CLI first, falls back to AppleScript automatically
+- CLI path configurable via `globalOptions.claudeCLIPath` in config.json
+- First-launch wizard prompts CLI install if not found
 
-However, during testing we hit a blocking issue with the **prompt delivery mechanism** — the AppleScript-based automation that sends prompts to Claude Desktop.
+### Menu UX Overhaul
+- Per-workflow submenus with: schedule timing, next fire, last run, prompt file
+- Inline **Run Now** (with hourglass feedback), **Open Prompt...**, **Edit Schedule...**, **Pause/Resume**
+- Removed clunky separate "Run Now" submenu
+- **+ New Workflow...** creates blank schedule and opens editor
+- Status text: white when active, gray when degraded
+- `KeyableWindow` subclass fixes keyboard input in menu bar app windows
 
-## The Problem
+### Schedule Editor (GUI)
+- Edit name, time, days of week (toggle buttons), prompt file, enabled, new conversation, Slack channel
+- **Auto-save** with debounce — green "Saved" pill flashes on changes
+- **Open Prompt** icon opens .md file in default editor (or prompts folder if file doesn't exist)
+- **Edit JSON** opens config.json directly
+- **Delete** with confirmation dialog
+- **Slack Test** button validates webhook + channel with human-readable errors
 
-`ClaudeAutomator.swift` sends prompts to Claude Desktop via AppleScript keystrokes:
+### Settings Window
+- Replaced broken TabView with segmented picker (General | Schedules | Notifications | Help | About)
+- **Help tab** with setup guide, config reference, prompt templates, file locations, troubleshooting
+- Save closes window and returns to menu
 
-```
-Activate Claude → Cmd+N (new conversation) → NSPasteboard copy → Cmd+V (paste) → Enter (submit)
-```
+### Slack Integration Fix
+- Fixed webhook payload from raw JSON to proper Slack format `{"text": "..."}`
+- Emoji status prefixes: Started, Completed, Failed
+- Per-workflow `slackChannel` in schedule options (overrides global default)
+- Auto-strips `#` prefix from channel names
 
-**Failure mode observed tonight:**
-1. Claude Desktop activates (switches to foreground) ✓
-2. Cmd+N / paste / Enter — **silently fails** ✗
-3. Retry logic fires 3 more times — all fail the same way
-4. Result: Claude is open but nothing was sent
+## Known Issues / Backlog
 
-**Root cause:** macOS Accessibility permission is invalidated every time the binary is rebuilt (code signature changes). The app must be re-authorized in System Settings > Privacy & Security > Accessibility after every build. Even after re-authorizing, the paste step still failed in testing.
+1. **Slack webhook 404** — User's webhook URL returning 404. Needs investigation (likely expired webhook). The error is now shown cleanly as "Webhook URL not found — check Settings"
+2. **Slack channel validation** — Test button works but depends on valid webhook URL first
+3. **macOS notification permission** — UNUserNotificationCenter may need explicit permission grant for unsigned builds
+4. **Run Now feedback** — Hourglass shows but takes 15-20s for CLI to complete. Consider progress indicator or estimated time
 
-**This is inherently fragile because:**
-- Depends on macOS Accessibility permissions (revoked on rebuild)
-- Depends on Claude Desktop's Electron UI layout not changing
-- Keystroke timing is guesswork (fixed delays between steps)
-- No feedback — can't tell if paste landed or Enter submitted
-- Screen focus race conditions with other apps
+## Files Modified (from v1.4.0)
 
-## Options
+| File | Changes |
+|------|---------|
+| `Services/ClaudeAutomator.swift` | CLI delivery, fallback, CLI-aware health check |
+| `Models/Config.swift` | `claudeCLIPath` in GlobalOptions |
+| `Models/Schedule.swift` | `slackChannel` in ScheduleOptions |
+| `Services/SchedulerEngine.swift` | `sendPrompt()` call, channel passthrough |
+| `Services/SlackNotifier.swift` | Proper Slack format, per-channel, test method, friendly errors |
+| `Views/SettingsView.swift` | Segmented tabs, HelpView, ScheduleEditorView, auto-save, Slack test |
+| `AppDelegate.swift` | CLI wizard, KeyableWindow, menu overhaul, editor/new workflow actions |
 
-### Option A: Fix AppleScript (patch current approach)
+## Architecture Notes for Next Session
 
-Debug the specific paste failure, add longer delays, possibly use AXUIElement APIs for more reliable UI targeting.
-
-- **Pro:** Minimal code change, keeps Claude Desktop as the interface
-- **Con:** Still fragile. Every Claude Desktop update could break it. Accessibility re-auth on every rebuild. No way to verify delivery.
-
-### Option B: `claude` CLI with `--print` mode (recommended)
-
-Replace AppleScript with a shell call to the Claude Code CLI:
-
-```swift
-// Instead of AppleScript keystrokes:
-let process = Process()
-process.executableURL = URL(fileURLWithPath: "/opt/homebrew/bin/claude")
-process.arguments = ["-p", "--print", prompt]
-```
-
-- **Pro:** Already installed (`claude` 2.1.37 on this machine). No UI automation. No Accessibility permission needed. Runs headless. Returns response text. Works through API — completely reliable.
-- **Con:** Uses Claude Code API credits (not free-tier Claude Desktop). Loses the visual "conversation in Claude Desktop" that the user sees. Different model context (no MCP servers, no project knowledge unless configured).
-- **Consideration:** Can pass `--model`, `--allowedTools`, `--add-dir`, `--mcp-config` flags to configure context. Could also use `--continue` to maintain conversation state across runs.
-
-### Option C: Anthropic API direct
-
-Call the Anthropic API directly from Swift using URLSession, bypassing both Claude Desktop and Claude Code CLI.
-
-- **Pro:** Maximum control and reliability. No external dependencies.
-- **Con:** Requires API key management in config. Most code to write. Same credit cost as Option B. No tool use or MCP without building it ourselves.
-
-### Option D: MCP (not viable)
-
-Claude Desktop is an MCP *client* — it connects to MCP servers for tools/resources. There's no way to push a prompt into Claude Desktop via MCP. Wrong architecture for this use case.
-
-## Recommendation
-
-**Option B (`claude -p`)** — best reliability-to-effort ratio:
-
-1. Replace `sendPromptToClaude()` internals with `Process()` call to `claude -p`
-2. Capture stdout as the response (enables future response handling)
-3. Remove all AppleScript/System Events code
-4. Remove Accessibility permission requirement
-5. Keep `activateClaude` config option — if true, also `open -a Claude` for visibility
-
-The change is ~30 lines in `ClaudeAutomator.swift`. Everything else (retry, locking, state persistence, health check) works unchanged.
-
-## What Still Works
-
-All Sprint 1 features are confirmed operational:
-- State persistence (state.json created after successful fire)
-- Retry logic (4 attempts with 5s/15s/45s backoff — verified in logs)
-- Sleep/wake recovery (wired up, needs sleep cycle to test)
-- Claude health check (menu shows status, blocks when not installed)
-- Execution locking (prevents duplicate runs)
-- Config file watching (auto-reloads on external edit)
-
-## Decision Needed
-
-Which prompt delivery method should we implement? This affects:
-- Whether OctopusScheduler uses API credits or free Claude Desktop
-- Whether prompts appear visually in Claude Desktop
-- Long-term maintenance burden
+- `ClaudeAutomator.cliPath` defaults to `/opt/homebrew/bin/claude`, overridden by `config.globalOptions.claudeCLIPath`
+- Schedule editor uses `KeyableWindow` (NSWindow subclass with `canBecomeKey = true`) for menu bar app compatibility
+- Auto-save uses `Timer` debounce at 0.6s, writes through `ConfigManager.save()`
+- Slack Test is async, returns human-readable errors via `friendlySlackError()` static method
