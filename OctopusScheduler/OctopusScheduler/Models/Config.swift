@@ -33,6 +33,7 @@ struct GlobalOptions: Codable {
     var launchAtLogin: Bool
     var showNotifications: Bool
     var logDirectory: String?
+    var allowConcurrentExecutions: Bool?
 }
 
 struct BridgeConfig: Codable {

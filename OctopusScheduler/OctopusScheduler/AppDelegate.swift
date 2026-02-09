@@ -15,11 +15,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private let bridgeService = BridgeService()
     private let httpServer = SchedulerHTTPServer()
     private var bridgeCancellable: AnyCancellable?
+    private var claudeCancellable: AnyCancellable?
     private var updateAvailableVersion: String?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupMenuBar()
         configManager.load()
+        configManager.startWatching()
 
         // Configure services
         let config = configManager.config ?? .defaultConfig
@@ -44,6 +46,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         bridgeCancellable = bridgeService.objectWillChange.sink(receiveValue: { [weak self] in
             DispatchQueue.main.async { self?.rebuildMenu() }
         })
+
+        // Claude health check
+        claudeAutomator.checkHealth()
+        claudeCancellable = claudeAutomator.objectWillChange.sink(receiveValue: { [weak self] in
+            DispatchQueue.main.async { self?.rebuildMenu() }
+        })
+        Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
+            self?.claudeAutomator.checkHealth()
+        }
+
+        // Sleep/wake recovery
+        schedulerEngine.startWakeObserver()
 
         // HTTP server
         if let httpConfig = config.http, httpConfig.enabled {
@@ -96,6 +110,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func configDidChange() {
+        let config = configManager.config ?? .defaultConfig
+        logService.configure(logDirectory: config.globalOptions.logDirectory)
+        notificationService.configure(enabled: config.globalOptions.showNotifications)
+        slackNotifier.configure(slackConfig: config.slack)
+        bridgeService.configure(bridgeUrl: config.bridge?.url)
+        schedulerEngine.restart()
         rebuildMenu()
     }
 
@@ -103,6 +123,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let menu = NSMenu()
         let config = configManager.config
         let schedules = config?.schedules ?? []
+
+        // Update menu bar icon based on Claude status
+        if let button = statusItem.button {
+            button.title = claudeAutomator.status == .notInstalled ? "⚠️" : "🐙"
+        }
 
         // Header
         let version = config?.version ?? Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.2.0"
@@ -123,6 +148,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let bridgeStatusItem = NSMenuItem(title: statusText, action: nil, keyEquivalent: "")
         bridgeStatusItem.isEnabled = false
         menu.addItem(bridgeStatusItem)
+
+        // Claude Desktop status
+        let claudeText: String
+        switch claudeAutomator.status {
+        case .ready:
+            claudeText = "🟢 Claude Desktop ready"
+        case .notRunning:
+            claudeText = "🟡 Claude Desktop not running"
+        case .notInstalled:
+            claudeText = "❌ Claude Desktop not installed"
+        }
+        let claudeStatusItem = NSMenuItem(title: claudeText, action: nil, keyEquivalent: "")
+        claudeStatusItem.isEnabled = false
+        menu.addItem(claudeStatusItem)
 
         menu.addItem(NSMenuItem.separator())
 

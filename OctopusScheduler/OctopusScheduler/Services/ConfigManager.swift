@@ -6,6 +6,9 @@ class ConfigManager: ObservableObject {
 
     @Published var config: AppConfig?
 
+    private var fileWatchSource: DispatchSourceFileSystemObject?
+    private var debounceTimer: Timer?
+
     func load() {
         let path = Self.configPath
         guard FileManager.default.fileExists(atPath: path),
@@ -23,6 +26,47 @@ class ConfigManager: ObservableObject {
         } catch {
             print("[OctopusScheduler] Failed to parse config: \(error)")
             config = nil
+        }
+    }
+
+    // MARK: - File Watching
+
+    func startWatching() {
+        let fd = open(Self.configPath, O_EVTONLY)
+        guard fd >= 0 else {
+            print("[OctopusScheduler] Could not open config file for watching")
+            return
+        }
+        let source = DispatchSource.makeFileSystemObjectSource(
+            fileDescriptor: fd, eventMask: [.write, .rename, .delete], queue: .main
+        )
+        source.setEventHandler { [weak self] in self?.handleConfigFileChange() }
+        source.setCancelHandler { close(fd) }
+        source.resume()
+        fileWatchSource = source
+        print("[OctopusScheduler] Watching config file for changes")
+    }
+
+    private func handleConfigFileChange() {
+        debounceTimer?.invalidate()
+        debounceTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: false) { [weak self] _ in
+            self?.reloadIfValid()
+        }
+    }
+
+    private func reloadIfValid() {
+        let path = Self.configPath
+        guard let data = FileManager.default.contents(atPath: path) else {
+            print("[OctopusScheduler] Config file not readable during reload")
+            return
+        }
+        do {
+            let decoded = try JSONDecoder().decode(AppConfig.self, from: data)
+            config = decoded
+            print("[OctopusScheduler] Config reloaded with \(decoded.schedules.count) schedule(s)")
+            NotificationCenter.default.post(name: Self.configDidChangeNotification, object: nil)
+        } catch {
+            print("[OctopusScheduler] Config file has invalid JSON — keeping current config: \(error)")
         }
     }
 

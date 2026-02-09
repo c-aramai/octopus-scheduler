@@ -1,12 +1,29 @@
 import Foundation
 import AppKit
+import Combine
 
-class ClaudeAutomator {
+enum ClaudeStatus {
+    case ready, notRunning, notInstalled
+}
+
+class ClaudeAutomator: ObservableObject {
     private static let claudeBundleID = "com.anthropic.claude"
+
+    @Published var status: ClaudeStatus = .notRunning
 
     /// Whether Claude Desktop is currently running.
     private var isClaudeRunning: Bool {
         !NSRunningApplication.runningApplications(withBundleIdentifier: Self.claudeBundleID).isEmpty
+    }
+
+    var isClaudeInstalled: Bool {
+        NSWorkspace.shared.urlForApplication(withBundleIdentifier: Self.claudeBundleID) != nil
+    }
+
+    func checkHealth() {
+        if !isClaudeInstalled { status = .notInstalled }
+        else if isClaudeRunning { status = .ready }
+        else { status = .notRunning }
     }
 
     /// Sends a prompt to Claude Desktop via AppleScript automation.

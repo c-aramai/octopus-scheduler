@@ -1,3 +1,12 @@
+## v1.4.0 — Bulletproof Foundation
+
+- **State Persistence** — Schedule last-fired timestamps persist to `~/.octopus-scheduler/state.json`, surviving app restarts
+- **Retry Logic** — Failed prompt deliveries retry 3 times with exponential backoff (5s, 15s, 45s)
+- **Sleep/Wake Recovery** — Detects missed fires after system wake and executes them as `[DELAYED]`
+- **Claude Health Check** — 30s polling shows Claude Desktop status in menu (ready/not running/not installed), blocks execution when not installed
+- **Execution Locking** — Prevents duplicate concurrent executions per schedule; optional `allowConcurrentExecutions` global config
+- **Config File Watching** — Auto-reloads config on external edits with debounce and JSON validation (invalid JSON keeps current config)
+
 ## v1.3.0 — Slack, HTTP API, Update Indicator
 
 - **Slack Notifications** — Posts to Slack webhook on prompt completion/failure
@@ -21,7 +30,7 @@
 
 ## Installation
 
-1. Download `OctopusScheduler-v1.3.0.zip`
+1. Download `OctopusScheduler-v1.4.0.zip`
 2. Unzip and drag `OctopusScheduler.app` to `/Applications`
 3. Right-click → Open (first launch, to bypass Gatekeeper)
 4. Copy `config/default-config.json` to `~/.octopus-scheduler/config.json`
