@@ -15,7 +15,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     let schedulerEngine = SchedulerEngine()
     private let claudeAutomator = ClaudeAutomator()
     private let promptLoader = PromptLoader()
-    private let notificationService = NotificationService()
+    let notificationService = NotificationService()
     private let logService = LogService()
     private let slackNotifier = SlackNotifier()
     private let bridgeService = BridgeService()
@@ -23,6 +23,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var bridgeCancellable: AnyCancellable?
     private var claudeCancellable: AnyCancellable?
     private var updateAvailableVersion: String?
+    private var runningWorkflowName: String?
+    private var runStartTime: Date?
+    private var runTimer: Timer?
     private var settingsWindow: NSWindow?
     private var editorWindow: NSWindow?
 
@@ -156,6 +159,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let headerItem = NSMenuItem(title: "OCTOPUS Scheduler v\(version)", action: nil, keyEquivalent: "")
         headerItem.isEnabled = false
         menu.addItem(headerItem)
+
+        // Running workflow indicator
+        if let workflowName = runningWorkflowName {
+            var runText = "⏳ Running: \(workflowName)"
+            if let start = runStartTime {
+                let elapsed = Int(Date().timeIntervalSince(start))
+                runText += " (\(elapsed)s)"
+            }
+            let runItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+            runItem.attributedTitle = NSAttributedString(string: runText, attributes: [.foregroundColor: NSColor.systemYellow])
+            runItem.isEnabled = false
+            menu.addItem(runItem)
+            menu.addItem(NSMenuItem.separator())
+        }
 
         // Connection status (live)
         let bridgeOK = bridgeService.status == .connected
@@ -426,15 +443,29 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func runNow(_ sender: NSMenuItem) {
         guard let scheduleId = sender.representedObject as? String else { return }
+        let name = configManager.config?.schedules.first(where: { $0.id == scheduleId })?.name ?? scheduleId
 
-        // Show activity in menu bar immediately
+        // Show activity in menu bar
+        runningWorkflowName = name
+        runStartTime = Date()
         if let button = statusItem.button {
             button.title = "⏳"
+        }
+        rebuildMenu()
+
+        // Tick the menu every 5s to update elapsed time
+        runTimer?.invalidate()
+        runTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in
+            self?.rebuildMenu()
         }
 
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             self?.schedulerEngine.executeNow(scheduleId: scheduleId)
             DispatchQueue.main.async {
+                self?.runTimer?.invalidate()
+                self?.runTimer = nil
+                self?.runningWorkflowName = nil
+                self?.runStartTime = nil
                 self?.rebuildMenu()
             }
         }
@@ -446,9 +477,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             NSApp.activate(ignoringOtherApps: true)
             return
         }
+        notificationService.checkAuthorizationStatus()
         let settingsView = SettingsView(
             configManager: configManager,
             schedulerEngine: schedulerEngine,
+            notificationService: notificationService,
             onSave: { [weak self] in
                 self?.settingsWindow?.close()
             }

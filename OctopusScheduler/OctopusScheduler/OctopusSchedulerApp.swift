@@ -8,7 +8,8 @@ struct OctopusSchedulerApp: App {
         Settings {
             SettingsView(
                 configManager: appDelegate.configManager,
-                schedulerEngine: appDelegate.schedulerEngine
+                schedulerEngine: appDelegate.schedulerEngine,
+                notificationService: appDelegate.notificationService
             )
         }
     }

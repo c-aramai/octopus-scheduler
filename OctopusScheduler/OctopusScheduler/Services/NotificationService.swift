@@ -1,13 +1,23 @@
 import Foundation
 import UserNotifications
 
-class NotificationService {
+class NotificationService: ObservableObject {
     private var enabled = true
+    @Published var authorizationStatus: UNAuthorizationStatus = .notDetermined
 
     func configure(enabled: Bool) {
         self.enabled = enabled
         if enabled {
             requestPermission()
+        }
+        checkAuthorizationStatus()
+    }
+
+    func checkAuthorizationStatus() {
+        UNUserNotificationCenter.current().getNotificationSettings { [weak self] settings in
+            DispatchQueue.main.async {
+                self?.authorizationStatus = settings.authorizationStatus
+            }
         }
     }
 
@@ -33,12 +43,13 @@ class NotificationService {
     }
 
     private func requestPermission() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, error in
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { [weak self] granted, error in
             if let error = error {
                 print("[Notifications] Permission error: \(error.localizedDescription)")
             } else if !granted {
                 print("[Notifications] Permission denied by user")
             }
+            self?.checkAuthorizationStatus()
         }
     }
 }

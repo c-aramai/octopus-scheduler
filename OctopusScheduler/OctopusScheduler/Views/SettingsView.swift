@@ -11,6 +11,7 @@ enum SettingsTab: String, CaseIterable {
 struct SettingsView: View {
     @ObservedObject var configManager: ConfigManager
     @ObservedObject var schedulerEngine: SchedulerEngine
+    @ObservedObject var notificationService: NotificationService
     var onSave: (() -> Void)?
     @State private var selectedTab: SettingsTab = .general
 
@@ -35,7 +36,7 @@ struct SettingsView: View {
                 case .schedules:
                     SchedulesSettingsView(configManager: configManager, schedulerEngine: schedulerEngine)
                 case .notifications:
-                    NotificationsSettingsView(configManager: configManager, schedulerEngine: schedulerEngine, onSave: onSave)
+                    NotificationsSettingsView(configManager: configManager, schedulerEngine: schedulerEngine, notificationService: notificationService, onSave: onSave)
                 case .help:
                     HelpView()
                 case .about:
@@ -224,7 +225,28 @@ struct SchedulesSettingsView: View {
 struct NotificationsSettingsView: View {
     @ObservedObject var configManager: ConfigManager
     @ObservedObject var schedulerEngine: SchedulerEngine
+    @ObservedObject var notificationService: NotificationService
     var onSave: (() -> Void)?
+
+    private var notificationStatusText: (String, Color)? {
+        switch notificationService.authorizationStatus {
+        case .denied:
+            return ("Notifications blocked — enable in System Settings > Notifications", .red)
+        case .notDetermined:
+            return ("Notification permission not yet requested", .secondary)
+        case .provisional, .authorized, .ephemeral:
+            return nil
+        @unknown default:
+            return nil
+        }
+    }
+
+    private func webhookWarning(_ url: String?) -> String? {
+        guard let url = url, !url.isEmpty else { return nil }
+        if url.hasPrefix("https://hooks.slack.com/services/") { return nil }
+        if url.hasPrefix("https://hooks.slack.com/workflows/") { return nil }
+        return "Expected format: https://hooks.slack.com/services/T.../B.../..."
+    }
 
     var body: some View {
         Form {
@@ -237,6 +259,12 @@ struct NotificationsSettingsView: View {
                         configManager.config = config
                     }
                 ))
+
+                if let warning = webhookWarning(config.slack?.webhookUrl) {
+                    Text(warning)
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                }
 
                 TextField("Default Slack Channel:", text: Binding(
                     get: { config.slack?.defaultChannel ?? "" },
@@ -254,6 +282,12 @@ struct NotificationsSettingsView: View {
                         configManager.config = config
                     }
                 ))
+
+                if let (text, color) = notificationStatusText {
+                    Text(text)
+                        .font(.caption)
+                        .foregroundColor(color)
+                }
 
                 Toggle("Notify on workflow complete", isOn: Binding(
                     get: { config.slack?.notifyOnComplete ?? true },

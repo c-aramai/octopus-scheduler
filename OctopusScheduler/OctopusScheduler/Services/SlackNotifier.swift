@@ -42,6 +42,16 @@ class SlackNotifier {
         self.notifyOnFailure = config.notifyOnFailure ?? true
     }
 
+    var isWebhookConfigured: Bool {
+        guard let url = webhookUrl, !url.isEmpty else { return false }
+        return true
+    }
+
+    var isWebhookValid: Bool {
+        guard let url = webhookUrl, !url.isEmpty else { return false }
+        return url.hasPrefix("https://hooks.slack.com/")
+    }
+
     func notify(event: SchedulerEvent) {
         guard let urlString = webhookUrl, let url = URL(string: urlString) else { return }
 
