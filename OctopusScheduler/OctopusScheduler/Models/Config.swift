@@ -9,6 +9,7 @@ struct AppConfig: Codable {
     var globalOptions: GlobalOptions
     var bridge: BridgeConfig?
     var slack: SlackConfig?
+    var http: HTTPConfig?
 
     static let defaultConfig = AppConfig(
         version: "1.2.0",
@@ -18,7 +19,8 @@ struct AppConfig: Codable {
         schedules: [],
         globalOptions: GlobalOptions(launchAtLogin: false, showNotifications: true, logDirectory: "~/.octopus-scheduler/logs"),
         bridge: BridgeConfig(),
-        slack: nil
+        slack: nil,
+        http: nil
     )
 
     /// Resolves the prompts directory path, expanding ~ to the home directory.
@@ -43,4 +45,10 @@ struct SlackConfig: Codable {
     var defaultChannel: String?
     var notifyOnComplete: Bool? = true
     var notifyOnFailure: Bool? = true
+}
+
+struct HTTPConfig: Codable {
+    var enabled: Bool = false
+    var port: Int = 19840
+    var secret: String = ""
 }

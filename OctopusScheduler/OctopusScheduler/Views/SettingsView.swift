@@ -72,6 +72,38 @@ struct GeneralSettingsView: View {
                     }
                 ))
 
+                Divider()
+
+                Text("HTTP Server")
+                    .font(.headline)
+
+                Toggle("Enable HTTP Server", isOn: Binding(
+                    get: { config.http?.enabled ?? false },
+                    set: { newValue in
+                        if config.http == nil { config.http = HTTPConfig() }
+                        config.http?.enabled = newValue
+                        configManager.config = config
+                    }
+                ))
+
+                TextField("Port:", text: Binding(
+                    get: { String(config.http?.port ?? 19840) },
+                    set: { newValue in
+                        if config.http == nil { config.http = HTTPConfig() }
+                        config.http?.port = Int(newValue) ?? 19840
+                        configManager.config = config
+                    }
+                ))
+
+                TextField("Secret:", text: Binding(
+                    get: { config.http?.secret ?? "" },
+                    set: { newValue in
+                        if config.http == nil { config.http = HTTPConfig() }
+                        config.http?.secret = newValue
+                        configManager.config = config
+                    }
+                ))
+
                 HStack {
                     Spacer()
                     Button("Save") {

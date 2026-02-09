@@ -23,6 +23,8 @@
 		AA10000E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA00000E /* Assets.xcassets */; };
 		AA10000F /* BridgeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000012 /* BridgeService.swift */; };
 		AA100010 /* UpdateChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000013 /* UpdateChecker.swift */; };
+		AA100011 /* SlackNotifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000014 /* SlackNotifier.swift */; };
+		AA100012 /* SchedulerHTTPServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000015 /* SchedulerHTTPServer.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -45,6 +47,8 @@
 		AA000011 /* LogService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogService.swift; sourceTree = "<group>"; };
 		AA000012 /* BridgeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeService.swift; sourceTree = "<group>"; };
 		AA000013 /* UpdateChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateChecker.swift; sourceTree = "<group>"; };
+		AA000014 /* SlackNotifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlackNotifier.swift; sourceTree = "<group>"; };
+		AA000015 /* SchedulerHTTPServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SchedulerHTTPServer.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -102,6 +106,8 @@
 				AA000011 /* LogService.swift */,
 				AA000012 /* BridgeService.swift */,
 				AA000013 /* UpdateChecker.swift */,
+				AA000014 /* SlackNotifier.swift */,
+				AA000015 /* SchedulerHTTPServer.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -210,6 +216,8 @@
 				AA10000D /* LogService.swift in Sources */,
 				AA10000F /* BridgeService.swift in Sources */,
 				AA100010 /* UpdateChecker.swift in Sources */,
+				AA100011 /* SlackNotifier.swift in Sources */,
+				AA100012 /* SchedulerHTTPServer.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

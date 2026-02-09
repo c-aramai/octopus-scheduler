@@ -1,13 +1,24 @@
 import Foundation
 
+struct ExecutionRecord {
+    let scheduleId: String
+    let scheduleName: String
+    let timestamp: Date
+    let success: Bool
+    let error: String?
+}
+
 class SchedulerEngine: ObservableObject {
     @Published var lastExecution: [String: Date] = [:]
+    private(set) var executionHistory: [ExecutionRecord] = []
+    private let maxHistory = 50
 
     private var configManager: ConfigManager?
     private var promptLoader: PromptLoader?
     private var claudeAutomator: ClaudeAutomator?
     private var notificationService: NotificationService?
     private var logService: LogService?
+    private var slackNotifier: SlackNotifier?
     private var timers: [String: Timer] = [:]
 
     func configure(
@@ -15,13 +26,15 @@ class SchedulerEngine: ObservableObject {
         promptLoader: PromptLoader,
         claudeAutomator: ClaudeAutomator,
         notificationService: NotificationService,
-        logService: LogService
+        logService: LogService,
+        slackNotifier: SlackNotifier? = nil
     ) {
         self.configManager = configManager
         self.promptLoader = promptLoader
         self.claudeAutomator = claudeAutomator
         self.notificationService = notificationService
         self.logService = logService
+        self.slackNotifier = slackNotifier
     }
 
     func start() {
@@ -87,16 +100,30 @@ class SchedulerEngine: ObservableObject {
 
         let filePath = (promptsDir as NSString).appendingPathComponent(schedule.promptFile)
         guard let template = promptLoader?.load(from: filePath) else {
+            let errorMsg = "Could not load prompt file"
             logService?.error("Failed to load prompt from \(filePath)")
             notificationService?.notify(
                 title: "OctopusScheduler",
                 body: "\(schedule.name) failed: could not load prompt file"
             )
+            slackNotifier?.notify(event: SchedulerEvent(
+                type: "prompt.failed",
+                scheduleId: schedule.id,
+                scheduleName: schedule.name,
+                error: errorMsg
+            ))
+            appendHistory(ExecutionRecord(scheduleId: schedule.id, scheduleName: schedule.name, timestamp: Date(), success: false, error: errorMsg))
             return
         }
 
         let renderedPrompt = template.rendered()
         let newConversation = schedule.options.newConversation ?? true
+
+        slackNotifier?.notify(event: SchedulerEvent(
+            type: "prompt.fired",
+            scheduleId: schedule.id,
+            scheduleName: schedule.name
+        ))
 
         let success = claudeAutomator?.sendPromptToClaude(renderedPrompt, newConversation: newConversation) ?? false
         if success {
@@ -105,15 +132,36 @@ class SchedulerEngine: ObservableObject {
                 title: "OctopusScheduler",
                 body: "\(schedule.name) sent to Claude"
             )
+            slackNotifier?.notify(event: SchedulerEvent(
+                type: "prompt.succeeded",
+                scheduleId: schedule.id,
+                scheduleName: schedule.name
+            ))
+            appendHistory(ExecutionRecord(scheduleId: schedule.id, scheduleName: schedule.name, timestamp: Date(), success: true, error: nil))
             DispatchQueue.main.async {
                 self.lastExecution[schedule.id] = Date()
             }
         } else {
+            let errorMsg = "Failed to send prompt to Claude"
             logService?.error("'\(schedule.name)' failed to send")
             notificationService?.notify(
                 title: "OctopusScheduler",
                 body: "\(schedule.name) failed to send"
             )
+            slackNotifier?.notify(event: SchedulerEvent(
+                type: "prompt.failed",
+                scheduleId: schedule.id,
+                scheduleName: schedule.name,
+                error: errorMsg
+            ))
+            appendHistory(ExecutionRecord(scheduleId: schedule.id, scheduleName: schedule.name, timestamp: Date(), success: false, error: errorMsg))
+        }
+    }
+
+    private func appendHistory(_ record: ExecutionRecord) {
+        executionHistory.append(record)
+        if executionHistory.count > maxHistory {
+            executionHistory.removeFirst(executionHistory.count - maxHistory)
         }
     }
 }

@@ -104,23 +104,24 @@
 
 *Connect to the broader OCTOPUS infrastructure.*
 
-### 4.1 Webhook Triggers (Inbound)
-- **Problem:** Only time-based triggers
-- **Solution:**
-  - Embed tiny HTTP server (Vapor or raw NIO, port 19840)
+### 4.1 Webhook Triggers (Inbound) ✅
+- **Status:** **COMPLETE (v1.3.0, OCTO-012)**
+- **Implemented:** NWListener HTTP server on port 19840 (no dependencies)
   - `POST /trigger/:schedule_id` — fires immediately
-  - `POST /trigger/:schedule_id?delay=5m` — fires after delay
-  - Auth via shared secret in config
-  - Enable n8n/Zapier/GitHub Actions to trigger prompts
+  - `GET /schedules` — list all schedules with next fire times
+  - `GET /history` — recent execution log
+  - `GET /status` — health check
+  - `PATCH /schedules/:id` — enable/disable remotely
+  - Auth via `Authorization: Bearer <secret>` header
 - **Effort:** Medium
 
-### 4.2 Webhook Events (Outbound)
-- **Problem:** No way to know when prompts fire externally
-- **Solution:**
-  - Reuse octopus-mcp-bridge webhook format
+### 4.2 Webhook Events (Outbound) ✅
+- **Status:** **COMPLETE (v1.3.0, OCTO-012)**
+- **Implemented:** SlackNotifier service posts to n8n webhook URL
   - Events: `prompt.fired`, `prompt.succeeded`, `prompt.failed`
-  - Configure `webhookUrl` and `webhookSecret` in globalOptions
-  - Fire-and-forget (don't block on webhook response)
+  - Configured via `config.slack.webhookUrl`
+  - Fire-and-forget (non-blocking `Task {}`)
+  - Respects `notifyOnComplete` / `notifyOnFailure` settings
 - **Effort:** Small
 
 ### 4.3 Response Capture
@@ -132,13 +133,13 @@
   - Option: `captureResponse: true` per schedule
 - **Effort:** Large (fragile, depends on Claude UI structure)
 
-### 4.4 Slack Integration
-- **Problem:** Results stay in Claude, team doesn't see them
-- **Solution:**
-  - Per-schedule option: `postToSlack: { channel: "#updates", includeResponse: true }`
-  - Uses captured response (requires 4.3)
-  - Or simpler: just post "Morning Briefing executed at 6:00 AM"
-  - Reuse `@slack/web-api` pattern from octopus-mcp-bridge
+### 4.4 Slack Integration ✅ (without response capture)
+- **Status:** **COMPLETE (v1.3.0, OCTO-012)** — notifications without response capture
+- **Implemented:** n8n workflow routes scheduler events to Slack
+  - `scheduler-to-slack.json` — webhook trigger → format → post to #octopus-state
+  - `slack-to-scheduler.json` — `/octopus` slash command → scheduler HTTP API → respond
+  - Channel configurable via `config.slack.defaultChannel`
+  - Response capture (4.3) remains future work for including Claude's reply
 - **Effort:** Small (without response), Medium (with response)
 
 ### 4.5 MCP Bridge Integration
@@ -235,18 +236,18 @@
 | Claude Health Check | Medium | Small | **P0** |
 | Config File Watching | Medium | Small | **P0** |
 | Execution Locking | Medium | Small | **P0** |
-| Webhook Events (Out) | High | Small | **P1** |
+| ~~Webhook Events (Out)~~ | ~~High~~ | ~~Small~~ | ✅ **v1.3.0** |
 | Cron Schedules | Medium | Small | **P1** |
 | Template Inheritance | Medium | Small | **P1** |
 | Visual Schedule Editor | High | Medium | **P1** |
 | Execution History | High | Medium | **P1** |
-| Webhook Triggers (In) | High | Medium | **P2** |
+| ~~Webhook Triggers (In)~~ | ~~High~~ | ~~Medium~~ | ✅ **v1.3.0** |
 | MCP Bridge Integration | High | Medium | **P2** |
 | Claude Code Support | High | Medium | **P2** |
 | Conditional Execution | Medium | Medium | **P2** |
 | Prompt Template Browser | Medium | Medium | **P2** |
 | Status Dashboard | Medium | Medium | **P2** |
-| Slack Integration | Medium | Medium | **P3** |
+| ~~Slack Integration~~ | ~~Medium~~ | ~~Medium~~ | ✅ **v1.3.0** |
 | Remote Prompt Repo | Medium | Medium | **P3** |
 | Response Capture | High | Large | **P3** |
 | Prompt Chaining | Medium | Large | **P3** |

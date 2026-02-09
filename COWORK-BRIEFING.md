@@ -53,14 +53,16 @@ Updated the Xcode project (project.pbxproj) to include the two new service files
 - 🐙 menu bar icon with schedule list, Run Now submenu, Settings, Sync Now, Quit
 - Morning Briefing and Evening Summary both tested manually via Run Now
 - Config loads/saves, schedules toggle on/off from menu
-- Settings window with General/Schedules/Notifications/About tabs
+- Settings window with General/Schedules/Notifications/About tabs + HTTP Server settings
 - Live Bridge status in menu bar (🟢 Connected / 🔴 Disconnected / ⚪ Not configured)
 - Peers Online section showing connected peers from Bridge network
 - "Sync Now" reloads config and refreshes Bridge status
-- Builds clean with both Xcode (Cmd+R) and SPM (`swift build`)
-- v1.2.1 distribution package available (zip with app, prompts, config, README)
-- "Check for Updates..." queries GitHub Releases API, shows download link if newer version exists
-- GitHub Releases infrastructure: v1.2.0 tagged and published with zip asset
+- Slack webhook notifications on prompt fire/success/failure (SlackNotifier)
+- HTTP trigger server on port 19840 (POST /trigger/:id, GET /status, GET /schedules, GET /history)
+- Execution history tracking (last 50 runs, exposed via HTTP /history)
+- "Check for Updates..." with update indicator in menu ("⬆ Update to vX.Y.Z...")
+- GitHub Releases: v1.2.0, v1.2.1, v1.3.0 tagged and published
+- Builds clean with both Xcode and xcodebuild
 
 **Not yet tested:**
 - Overnight scheduled execution (timers are set, just hasn't hit 6:00 AM yet)
@@ -84,8 +86,8 @@ Updated the Xcode project (project.pbxproj) to include the two new service files
 ~/.octopus-scheduler/config.json              # Runtime config (schedules + bridge URL)
 ~/ARAMAI/prompts/scheduled/morning-briefing.md # Sample prompt template
 ~/ARAMAI/dev/octopus-scheduler/SPEC-v2.md      # Updated specification
-~/ARAMAI/dev/octopus-scheduler/OctopusScheduler/  # Full project (15 source files)
-~/ARAMAI/dev/octopus-scheduler/OctopusScheduler/build/dist/OctopusScheduler-v1.2.1.zip  # Distribution package
+~/ARAMAI/dev/octopus-scheduler/OctopusScheduler/  # Full project (18 source files)
+~/ARAMAI/dev/octopus-scheduler/dist/OctopusScheduler-v1.3.0.zip  # Distribution package
 ~/ARAMAI/dev/octopus-scheduler/docs/RELEASING.md  # Release process documentation
 ```
 
@@ -98,11 +100,11 @@ Only 3 permissions needed (down from 4 — eliminated Screen Recording):
 
 ## Next Steps
 
-- Verify scheduled execution fires at 6:00 AM
-- Test notification display
-- Check log files at `~/.octopus-scheduler/logs/`
-- Distribute v1.2.0 package to Mariam for DevRel ops
-- Configure Slack webhook for #devrel-ops notifications
+- Distribute v1.3.0 package to Mariam (update from v1.2.0)
+- Verify overnight scheduled execution fires correctly
+- Test Slack webhook delivery end-to-end with n8n
+- Test HTTP trigger from external automation (n8n, curl)
+- Wire up MCP Bridge handoff on prompt fire (Phase 4.5)
 
 ## Repository
 
