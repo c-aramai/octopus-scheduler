@@ -1,3 +1,10 @@
+## v1.3.0 — Slack, HTTP API, Update Indicator
+
+- **Slack Notifications** — Posts to Slack webhook on prompt completion/failure
+- **HTTP Trigger API** — Local HTTP server (port 19840) for external trigger via `POST /trigger/:id`
+- **Update Indicator** — Menu shows "⬆ Update to vX.Y.Z..." when newer release detected
+- **Schedule Patch API** — `PATCH /schedules/:id` to enable/disable schedules remotely
+
 ## v1.2.1 — Check for Updates
 
 - **Check for Updates** — Menu item queries GitHub Releases API, shows dialog with download link if newer version available
@@ -14,7 +21,7 @@
 
 ## Installation
 
-1. Download `OctopusScheduler-v1.2.1.zip`
+1. Download `OctopusScheduler-v1.3.0.zip`
 2. Unzip and drag `OctopusScheduler.app` to `/Applications`
 3. Right-click → Open (first launch, to bypass Gatekeeper)
 4. Copy `config/default-config.json` to `~/.octopus-scheduler/config.json`
