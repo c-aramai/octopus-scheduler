@@ -3,7 +3,7 @@
 **Date:** 2026-02-09
 **From:** logos-ui session (Opus 4.6)
 **Repo:** https://github.com/c-aramai/octopus-scheduler
-**Current version:** v1.5.1 (release: https://github.com/c-aramai/octopus-scheduler/releases/tag/v1.5.1)
+**Current version:** v1.5.2 (release: https://github.com/c-aramai/octopus-scheduler/releases/tag/v1.5.2)
 
 ## What Shipped Tonight
 
@@ -58,6 +58,16 @@
 - Webhook URL configured and verified — messages posting to `#octopus-state`
 - Previous `localhost:5679` placeholder replaced with live `hooks.slack.com` webhook
 
+## Bridge Event Forwarding (Feb 9)
+
+- **New endpoint:** `POST /bridge/events` receives webhook events from Bridge and forwards them to Slack
+- **HMAC verification** via `x-octopus-signature` header using CryptoKit SHA256 — bypasses Bearer token auth
+- **Emoji-formatted messages** — 10 event types mapped (task.created, task.claimed, task.completed, session.registered, session.stale, escalation, logos.node.created/updated, logos.compose.started/completed), unknown events get fallback `📡`
+- **Event filtering** — optional `forwardEvents` array limits which events get forwarded; nil = forward all
+- **Config:** new `bridgeForward` section in config.json with `enabled`, `webhookSecret`, `forwardEvents`, `slackChannel`
+- **Hot reload** — `configDidChange()` updates `bridgeForwardConfig` on the HTTP server without restart
+- Bridge side: set `N8N_WEBHOOK_URL=http://localhost:19840/bridge/events` and `N8N_WEBHOOK_SECRET`
+
 ## Known Issues / Backlog
 
 None — all clear.
@@ -67,12 +77,13 @@ None — all clear.
 | File | Changes |
 |------|---------|
 | `Services/ClaudeAutomator.swift` | CLI delivery, fallback, CLI-aware health check, `/tmp` working dir for TCC isolation |
-| `Models/Config.swift` | `claudeCLIPath` in GlobalOptions |
+| `Models/Config.swift` | `claudeCLIPath` in GlobalOptions, `BridgeForwardConfig` struct |
 | `Models/Schedule.swift` | `slackChannel` in ScheduleOptions |
 | `Services/SchedulerEngine.swift` | `sendPrompt()` call, channel passthrough |
-| `Services/SlackNotifier.swift` | Proper Slack format, per-channel, test method, friendly errors |
+| `Services/SlackNotifier.swift` | Proper Slack format, per-channel, test method, friendly errors, bridge event forwarding |
+| `Services/SchedulerHTTPServer.swift` | `/bridge/events` endpoint with HMAC verification, CryptoKit |
 | `Views/SettingsView.swift` | Segmented tabs, HelpView, ScheduleEditorView, auto-save, Slack test, webhook validation, notification status |
-| `AppDelegate.swift` | CLI wizard, KeyableWindow, menu overhaul, editor/new workflow actions, Run Now progress |
+| `AppDelegate.swift` | CLI wizard, KeyableWindow, menu overhaul, editor/new workflow actions, Run Now progress, bridge forward wiring |
 | `Services/NotificationService.swift` | ObservableObject with published authorization status |
 
 ## Architecture Notes for Next Session

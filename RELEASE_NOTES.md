@@ -1,3 +1,11 @@
+## v1.5.3 — Bridge Event Forwarding
+
+- **Bridge Webhook Endpoint** — `POST /bridge/events` receives events from Bridge and forwards to Slack with emoji-formatted messages
+- **HMAC Verification** — `x-octopus-signature` header verified via CryptoKit SHA256; bypasses Bearer token auth
+- **Event Mapping** — 10 event types with emoji/label (task, session, escalation, logos node/compose), unknown events get `📡` fallback
+- **Event Filtering** — Optional `forwardEvents` whitelist; nil forwards all events
+- **Config Hot Reload** — `bridgeForward` config updates apply without server restart
+
 ## v1.5.1 — UX Polish & TCC Fix
 
 - **Hardened Runtime** — Eliminates macOS TCC permission prompts for Desktop/Music access
@@ -47,7 +55,7 @@
 
 ## Installation
 
-1. Download `OctopusScheduler-v1.5.1.zip`
+1. Download `OctopusScheduler-v1.5.3.zip`
 2. Unzip and drag `OctopusScheduler.app` to `/Applications`
 3. Right-click → Open (first launch, to bypass Gatekeeper)
 4. Copy `config/default-config.json` to `~/.octopus-scheduler/config.json`
