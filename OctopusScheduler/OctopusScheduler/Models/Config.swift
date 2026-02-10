@@ -10,6 +10,7 @@ struct AppConfig: Codable {
     var bridge: BridgeConfig?
     var slack: SlackConfig?
     var http: HTTPConfig?
+    var bridgeForward: BridgeForwardConfig?
 
     static let defaultConfig = AppConfig(
         version: "1.2.0",
@@ -53,4 +54,11 @@ struct HTTPConfig: Codable {
     var enabled: Bool = false
     var port: Int = 19840
     var secret: String = ""
+}
+
+struct BridgeForwardConfig: Codable {
+    var enabled: Bool = false
+    var webhookSecret: String = ""
+    var forwardEvents: [String]? = nil
+    var slackChannel: String? = nil
 }

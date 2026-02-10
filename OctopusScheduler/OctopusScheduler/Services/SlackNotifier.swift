@@ -133,6 +133,62 @@ class SlackNotifier {
         }
     }
 
+    // MARK: - Bridge Event Forwarding
+
+    private static let bridgeEventFormat: [String: (emoji: String, label: String)] = [
+        "task.created":              ("📋", "Task Created"),
+        "task.claimed":              ("🤚", "Task Claimed"),
+        "task.completed":            ("✅", "Task Completed"),
+        "session.registered":        ("🔌", "Agent Connected"),
+        "session.stale":             ("⚠️", "Agent Stale"),
+        "escalation":                ("🚨", "Escalation"),
+        "logos.node.created":        ("🌱", "Node Created"),
+        "logos.node.updated":        ("✏️", "Node Updated"),
+        "logos.compose.started":     ("🎼", "Composition Started"),
+        "logos.compose.completed":   ("🎵", "Composition Completed"),
+    ]
+
+    func forwardBridgeEvent(type: String, data: [String: Any], channel: String?) {
+        guard let urlString = webhookUrl, let url = URL(string: urlString) else { return }
+
+        let format = Self.bridgeEventFormat[type] ?? ("📡", type)
+        var text = "\(format.emoji) *\(format.label)*"
+
+        let details = data.compactMap { key, value -> String? in
+            guard let str = value as? String ?? (value as? NSNumber)?.stringValue else { return nil }
+            return "\(key): \(str)"
+        }
+        if !details.isEmpty {
+            text += "\n> " + details.joined(separator: "\n> ")
+        }
+
+        var payload: [String: Any] = ["text": text]
+        if var ch = channel ?? defaultChannel, !ch.isEmpty {
+            if ch.hasPrefix("#") { ch = String(ch.dropFirst()) }
+            payload["channel"] = ch
+        }
+
+        guard let body = try? JSONSerialization.data(withJSONObject: payload) else { return }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = body
+
+        Task {
+            do {
+                let (_, response) = try await URLSession.shared.data(for: request)
+                if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode >= 400 {
+                    print("[SlackNotifier] Bridge forward returned \(httpResponse.statusCode) for \(type)")
+                }
+            } catch {
+                print("[SlackNotifier] Failed to forward bridge event \(type): \(error.localizedDescription)")
+            }
+        }
+    }
+
+    // MARK: - Error Helpers
+
     private static func friendlySlackError(status: Int, body: String) -> String {
         switch status {
         case 404:

@@ -83,7 +83,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // HTTP server
         if let httpConfig = config.http, httpConfig.enabled {
-            httpServer.start(config: httpConfig, schedulerEngine: schedulerEngine, configManager: configManager, logService: logService)
+            httpServer.start(config: httpConfig, schedulerEngine: schedulerEngine, configManager: configManager, logService: logService, slackNotifier: slackNotifier, bridgeForwardConfig: config.bridgeForward)
         }
 
         // Silent update check
@@ -137,6 +137,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         notificationService.configure(enabled: config.globalOptions.showNotifications)
         slackNotifier.configure(slackConfig: config.slack)
         bridgeService.configure(bridgeUrl: config.bridge?.url)
+        httpServer.bridgeForwardConfig = config.bridgeForward
         if let cliPath = config.globalOptions.claudeCLIPath {
             claudeAutomator.cliPath = cliPath
         }

@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import Network
 
@@ -7,13 +8,17 @@ class SchedulerHTTPServer {
     private weak var schedulerEngine: SchedulerEngine?
     private weak var configManager: ConfigManager?
     private weak var logService: LogService?
+    private weak var slackNotifier: SlackNotifier?
+    var bridgeForwardConfig: BridgeForwardConfig?
     private let startTime = Date()
 
-    func start(config: HTTPConfig, schedulerEngine: SchedulerEngine, configManager: ConfigManager, logService: LogService?) {
+    func start(config: HTTPConfig, schedulerEngine: SchedulerEngine, configManager: ConfigManager, logService: LogService?, slackNotifier: SlackNotifier? = nil, bridgeForwardConfig: BridgeForwardConfig? = nil) {
         self.secret = config.secret
         self.schedulerEngine = schedulerEngine
         self.configManager = configManager
         self.logService = logService
+        self.slackNotifier = slackNotifier
+        self.bridgeForwardConfig = bridgeForwardConfig
 
         do {
             let params = NWParameters.tcp
@@ -134,6 +139,12 @@ class SchedulerHTTPServer {
     private func processRequest(data: Data, connection: NWConnection) {
         guard let request = parseHTTPRequest(data: data) else {
             sendResponse(connection: connection, status: 400, body: ["error": "Bad request"])
+            return
+        }
+
+        // Bridge events use HMAC auth, not Bearer token
+        if request.method == "POST" && request.path == "/bridge/events" {
+            handleBridgeEvent(request: request, connection: connection)
             return
         }
 
@@ -284,6 +295,55 @@ class SchedulerHTTPServer {
         } else {
             sendResponse(connection: connection, status: 400, body: ["error": "Missing or invalid 'enabled' field in body"])
         }
+    }
+
+    // MARK: - Bridge Event Forwarding
+
+    private func handleBridgeEvent(request: HTTPRequest, connection: NWConnection) {
+        guard let config = bridgeForwardConfig, config.enabled else {
+            sendResponse(connection: connection, status: 404, body: ["error": "Not found"])
+            return
+        }
+
+        guard let bodyData = request.body, !bodyData.isEmpty else {
+            sendResponse(connection: connection, status: 400, body: ["error": "Empty body"])
+            return
+        }
+
+        // HMAC verification
+        let secret = config.webhookSecret
+        if !secret.isEmpty {
+            let signature = request.headers["x-octopus-signature"] ?? ""
+            let key = SymmetricKey(data: Data(secret.utf8))
+            let mac = HMAC<SHA256>.authenticationCode(for: bodyData, using: key)
+            let expected = "sha256=" + mac.map { String(format: "%02x", $0) }.joined()
+
+            guard signature == expected else {
+                logService?.error("Bridge event HMAC mismatch")
+                sendResponse(connection: connection, status: 401, body: ["error": "Invalid signature"])
+                return
+            }
+        }
+
+        guard let json = try? JSONSerialization.jsonObject(with: bodyData) as? [String: Any] else {
+            sendResponse(connection: connection, status: 400, body: ["error": "Invalid JSON"])
+            return
+        }
+
+        let eventType = (json["event"] as? String) ?? (json["type"] as? String) ?? "unknown"
+
+        // Check event filter
+        if let allowedEvents = config.forwardEvents, !allowedEvents.contains(eventType) {
+            sendResponse(connection: connection, status: 200, body: ["received": true, "forwarded": false])
+            return
+        }
+
+        let data = (json["data"] as? [String: Any]) ?? (json["payload"] as? [String: Any]) ?? [:]
+
+        logService?.log("Bridge event received: \(eventType)")
+        slackNotifier?.forwardBridgeEvent(type: eventType, data: data, channel: config.slackChannel)
+
+        sendResponse(connection: connection, status: 200, body: ["received": true])
     }
 
     // MARK: - HTTP Parsing
