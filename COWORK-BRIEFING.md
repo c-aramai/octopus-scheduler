@@ -53,10 +53,14 @@
 - **CLI process isolation** — `process.currentDirectoryURL` set to `/tmp` in `sendPromptViaCLI()`. Child process no longer inherits working directory that may reference TCC-protected folders (Desktop, Music, etc.).
 - App Sandbox intentionally NOT used (would sandbox the CLI child process and break core functionality).
 
+## Slack Integration (Feb 9)
+
+- Webhook URL configured and verified — messages posting to `#octopus-state`
+- Previous `localhost:5679` placeholder replaced with live `hooks.slack.com` webhook
+
 ## Known Issues / Backlog
 
-1. **Slack webhook URL** — Config still points to `localhost:5679`. Needs a fresh Slack webhook from workspace admin.
-2. **Slack channel validation** — Test button works but depends on valid webhook URL first
+None — all clear.
 
 ## Files Modified (from v1.4.0)
 
