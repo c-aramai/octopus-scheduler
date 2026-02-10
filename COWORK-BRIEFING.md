@@ -47,6 +47,12 @@
 - **Notification permission feedback** — Notifications tab shows macOS authorization status (blocked, not requested, granted). Directs user to System Settings when blocked.
 - **Run Now progress** — Menu shows "Running: [workflow name] (Xs)" in yellow with elapsed time counter, updates every 5s, clears on completion
 
+## TCC Permission Fix (Feb 9)
+
+- **Hardened runtime enabled** — `ENABLE_HARDENED_RUNTIME = YES` in both Debug and Release configs. Prevents macOS from applying strict TCC heuristics to the app.
+- **CLI process isolation** — `process.currentDirectoryURL` set to `/tmp` in `sendPromptViaCLI()`. Child process no longer inherits working directory that may reference TCC-protected folders (Desktop, Music, etc.).
+- App Sandbox intentionally NOT used (would sandbox the CLI child process and break core functionality).
+
 ## Known Issues / Backlog
 
 1. **Slack webhook URL** — Config still points to `localhost:5679`. Needs a fresh Slack webhook from workspace admin.
@@ -56,7 +62,7 @@
 
 | File | Changes |
 |------|---------|
-| `Services/ClaudeAutomator.swift` | CLI delivery, fallback, CLI-aware health check |
+| `Services/ClaudeAutomator.swift` | CLI delivery, fallback, CLI-aware health check, `/tmp` working dir for TCC isolation |
 | `Models/Config.swift` | `claudeCLIPath` in GlobalOptions |
 | `Models/Schedule.swift` | `slackChannel` in ScheduleOptions |
 | `Services/SchedulerEngine.swift` | `sendPrompt()` call, channel passthrough |
