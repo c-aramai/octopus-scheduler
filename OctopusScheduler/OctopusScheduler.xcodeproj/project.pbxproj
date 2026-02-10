@@ -231,6 +231,7 @@
 				CODE_SIGN_ENTITLEMENTS = OctopusScheduler/OctopusScheduler.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = OctopusScheduler/Info.plist;
@@ -255,6 +256,7 @@
 				CODE_SIGN_ENTITLEMENTS = OctopusScheduler/OctopusScheduler.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = OctopusScheduler/Info.plist;

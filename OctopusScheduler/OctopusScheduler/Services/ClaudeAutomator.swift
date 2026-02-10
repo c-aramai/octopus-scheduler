@@ -47,6 +47,7 @@ class ClaudeAutomator: ObservableObject {
     func sendPromptViaCLI(_ prompt: String) -> Bool {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: cliPath)
+        process.currentDirectoryURL = URL(fileURLWithPath: "/tmp")
         process.arguments = ["-p", "--print", prompt]
         process.standardOutput = Pipe()
         process.standardError = Pipe()
