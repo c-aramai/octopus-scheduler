@@ -3,7 +3,7 @@
 **Date:** 2026-02-09
 **From:** logos-ui session (Opus 4.6)
 **Repo:** https://github.com/c-aramai/octopus-scheduler
-**Current version:** v1.5.2 (release: https://github.com/c-aramai/octopus-scheduler/releases/tag/v1.5.2)
+**Current version:** v1.5.3 (release: https://github.com/c-aramai/octopus-scheduler/releases/tag/v1.5.3)
 
 ## What Shipped Tonight
 
