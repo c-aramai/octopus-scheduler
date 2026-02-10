@@ -1,3 +1,20 @@
+## v1.5.1 — UX Polish & TCC Fix
+
+- **Hardened Runtime** — Eliminates macOS TCC permission prompts for Desktop/Music access
+- **CLI Process Isolation** — Child process working directory set to `/tmp`, preventing TCC-protected path access
+- **Slack Webhook Validation** — Settings warns with orange text when URL doesn't match `hooks.slack.com` format
+- **Notification Permission Feedback** — Notifications tab shows macOS authorization status with guidance to System Settings
+- **Run Now Progress** — Menu shows "Running: [workflow name] (Xs)" in yellow with elapsed time counter
+
+## v1.5.0 — CLI Delivery & Menu Overhaul
+
+- **Dual-Mode Delivery** — Claude Code CLI (`claude -p --print`) primary, AppleScript fallback
+- **Schedule Editor GUI** — Edit name, time, days, prompt file, Slack channel with auto-save
+- **Menu UX Overhaul** — Per-workflow submenus with Run Now, Open Prompt, Edit Schedule, Pause/Resume
+- **Settings Redesign** — Segmented picker tabs (General, Schedules, Notifications, Help, About)
+- **Slack Integration Fix** — Proper payload format, per-workflow channels, emoji status prefixes
+- **Help Tab** — Setup guide, config reference, prompt templates, troubleshooting
+
 ## v1.4.0 — Bulletproof Foundation
 
 - **State Persistence** — Schedule last-fired timestamps persist to `~/.octopus-scheduler/state.json`, surviving app restarts
@@ -30,7 +47,7 @@
 
 ## Installation
 
-1. Download `OctopusScheduler-v1.4.0.zip`
+1. Download `OctopusScheduler-v1.5.1.zip`
 2. Unzip and drag `OctopusScheduler.app` to `/Applications`
 3. Right-click → Open (first launch, to bypass Gatekeeper)
 4. Copy `config/default-config.json` to `~/.octopus-scheduler/config.json`
@@ -39,6 +56,5 @@
 ## Requirements
 
 - macOS 13+ (Ventura or later)
-- Claude Desktop installed
-- Accessibility permission granted
+- Claude Code CLI (`claude`) or Claude Desktop installed
 - Network access to octopus-bridge.vercel.app (for Bridge features)
